@@ -1,6 +1,7 @@
 "use client"
 
 import { LogOut, User } from "lucide-react"
+import { signOut } from "next-auth/react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "@/components/ui/button"
 import { SidebarTrigger } from "@/components/ui/sidebar"
@@ -16,7 +17,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 
 export function Topbar() {
-  const { user, logout } = useAuth()
+  const { user } = useAuth()
 
   const initials = user?.name
     ? user.name
@@ -25,6 +26,12 @@ export function Topbar() {
         .join("")
         .toUpperCase()
     : "U"
+
+  const handleLogout = async () => {
+    await signOut({
+      callbackUrl: "/login",
+    })
+  }
 
   return (
     <header className="flex h-14 items-center gap-3 border-b border-border bg-card px-4">
@@ -59,7 +66,7 @@ export function Topbar() {
             Profile
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={logout} className="gap-2 text-destructive">
+          <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive">
             <LogOut className="size-4" />
             Log out
           </DropdownMenuItem>

@@ -1,281 +1,288 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { toast } from "sonner"
+import { useEffect, useState } from "react"
+import { useRouter, useParams } from "next/navigation"
 import { Trash2 } from "lucide-react"
-import { useFloorsContext } from "@/lib/floor-context"
 
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { Switch } from "@/components/ui/switch"
+interface Board {
+  id: number | string
+  board_uid: string
+  serial_number: string
+  email: string | null
+  enabled: boolean
+  floor_id: number | null
+  isNew?: boolean
+}
+
+const API = "https://api.wattsense.in/api"
 
 export default function EditFloorPage() {
-  const params = useParams<{ floorId: string }>()
-  const floorId = params.floorId
+  const router = useRouter()
+  const params = useParams()
+  const floorId = Number(params?.floorId)
 
-  const {
-    floors,
-    updateFloor,
-    addBoard,
-    toggleBoard,
-    deleteBoard,
-  } = useFloorsContext()
+  const [boards, setBoards] = useState<Board[]>([])
+  const [addCount, setAddCount] = useState(1)
+  const [saving, setSaving] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const floor = useMemo(
-    () => floors.find((item) => item.id === floorId),
-    [floors, floorId]
-  )
-
-  const [remarks, setRemarks] = useState("")
-  const [boardsToAdd, setBoardsToAdd] = useState<number>(1)
-  const [emailErrors, setEmailErrors] = useState<Record<string, boolean>>({})
-
+  // 🔹 Load boards for this floor
   useEffect(() => {
-    if (floor) {
-      setRemarks(floor.remarks ?? "")
-    }
-  }, [floor])
-
-  if (!floor) {
-    return (
-      <div className="flex min-h-[300px] items-center justify-center">
-        Floor not found
-      </div>
-    )
-  }
-
-  // ✅ Email validation
-  const validateEmail = (email: string) => {
-    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    return regex.test(email)
-  }
-
-  const handleSave = () => {
-    let hasError = false
-    const newErrors: Record<string, boolean> = {}
-
-    floor.boards.forEach((board) => {
-      if (board.email && !validateEmail(board.email)) {
-        newErrors[board.id] = true
-        hasError = true
-      }
-    })
-
-    if (hasError) {
-      setEmailErrors(newErrors)
-      toast.error("Please fix invalid emails before saving.")
+    if (!floorId) {
+      setError("Invalid floor ID")
+      setLoading(false)
       return
     }
 
-    updateFloor(floor.id, { remarks })
-    toast.success("Floor updated successfully")
-  }
+    async function fetchBoards() {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const handleBulkAdd = () => {
-    const count = boardsToAdd < 1 ? 1 : boardsToAdd
+        const res = await fetch(`${API}/boards`)
+        if (!res.ok) throw new Error("Failed to load boards")
 
-    for (let i = 0; i < count; i++) {
-      addBoard(floor.id)
+        const data: Board[] = await res.json()
+
+        const filtered = data.filter(
+          (b) => String(b.floor_id) === String(floorId)
+        )
+
+        setBoards(filtered)
+      } catch (err) {
+        console.error(err)
+        setError("Failed to load boards")
+      } finally {
+        setLoading(false)
+      }
     }
 
-    setBoardsToAdd(1)
+    fetchBoards()
+  }, [floorId])
+
+  // 🔹 Add new temp boards
+  function addBoards() {
+    const newBoards: Board[] = []
+
+    for (let i = 0; i < addCount; i++) {
+      newBoards.push({
+        id: `temp-${Date.now()}-${i}`,
+        board_uid: "",
+        serial_number: "",
+        email: "",
+        enabled: true,
+        floor_id: floorId,
+        isNew: true,
+      })
+    }
+
+    setBoards((prev) => [...prev, ...newBoards])
+    setAddCount(1)
   }
 
-  const handleDeleteBoard = (boardId: string) => {
-    deleteBoard(floor.id, boardId)
-    toast.success("Board deleted")
+  // 🔹 Update field locally
+  function updateBoardField(
+    id: number | string,
+    field: keyof Board,
+    value: any
+  ) {
+    setBoards((prev) =>
+      prev.map((b) => (b.id === id ? { ...b, [field]: value } : b))
+    )
   }
+
+  // 🔹 Delete board
+  async function deleteBoard(id: number | string) {
+    if (typeof id === "string") {
+      setBoards((prev) => prev.filter((b) => b.id !== id))
+      return
+    }
+
+    if (!confirm("Delete this board permanently?")) return
+
+    try {
+      const res = await fetch(`${API}/boards/${id}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) throw new Error("Delete failed")
+
+      setBoards((prev) => prev.filter((b) => b.id !== id))
+    } catch (err) {
+      alert("Failed to delete board")
+    }
+  }
+
+  // 🔹 Save Changes
+  async function saveChanges() {
+    try {
+      setSaving(true)
+
+      for (const board of boards) {
+        // CREATE
+        if (board.isNew) {
+          const res = await fetch(`${API}/boards/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: board.email || "",
+              floor_id: floorId,
+            }),
+          })
+
+          if (!res.ok) {
+            alert("Board create failed")
+            setSaving(false)
+            return
+          }
+        }
+        // UPDATE
+        else {
+          const res = await fetch(`${API}/boards/${board.id}`, {
+            method: "PATCH",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: board.email,
+              enabled: board.enabled,
+            }),
+          })
+
+          if (!res.ok) {
+            alert("Board update failed")
+            setSaving(false)
+            return
+          }
+        }
+      }
+
+      alert("Saved successfully ✅")
+      window.location.reload()
+    } catch (err) {
+      console.error(err)
+      alert("Error saving boards")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading)
+    return <div className="p-6 text-gray-500">Loading boards...</div>
+
+  if (error)
+    return (
+      <div className="p-6 text-red-600">
+        {error}
+      </div>
+    )
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-        <div>
-          <h1 className="text-base font-semibold text-sky-900">
-            Edit Board Data
-          </h1>
-        </div>
+    <div className="p-6 space-y-6 text-sm">
+      <div className="flex justify-between items-center">
+        <h1 className="text-xl font-semibold">Edit Board Data</h1>
 
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link href="/dashboard/boards">Back</Link>
-          </Button>
-          <Button
-            size="sm"
-            className="bg-emerald-500 text-white hover:bg-emerald-600"
-            onClick={handleSave}
+        <div className="flex gap-3">
+          <button
+            onClick={() => router.back()}
+            className="px-4 py-2 border rounded-md"
           >
-            Save
-          </Button>
+            Back
+          </button>
+
+          <button
+            onClick={saveChanges}
+            disabled={saving}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">
-            Floor Details
-          </CardTitle>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Floor Info */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label>Floor ID</Label>
-              <Input
-                value={floor.id}
-                disabled
-                className="font-mono text-xs"
-              />
-            </div>
-
-            <div>
-              <Label>Remarks</Label>
-              <Input
-                value={remarks}
-                onChange={(e) => setRemarks(e.target.value)}
-              />
-            </div>
-          </div>
-
-          {/* Bulk Add Boards */}
-          <div className="flex items-center justify-end gap-2">
-            <Input
-              type="number"
-              min={1}
-              value={boardsToAdd}
-              onChange={(e) =>
-                setBoardsToAdd(
-                  Math.max(1, parseInt(e.target.value || "1", 10))
-                )
-              }
-              className="w-20 h-8 text-sm"
-            />
-
-            <Button
-              onClick={handleBulkAdd}
-              size="sm"
-              variant="outline"
-            >
-              + Add Board(s)
-            </Button>
-          </div>
-
-          {/* Boards Table */}
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Board ID</TableHead>
-                  <TableHead>Serial</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Action</TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {floor.boards.map((board, index) => (
-                  <TableRow key={board.id}>
-                    <TableCell>{index + 1}</TableCell>
-
-                    <TableCell className="font-mono text-xs">
-                      {board.id}
-                    </TableCell>
-
-                    <TableCell className="font-mono text-xs">
-                      {board.serial}
-                    </TableCell>
-
-                    <TableCell>
-                      <Input
-                        value={board.email}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          updateFloor(floor.id, {
-                            boards: floor.boards.map((b) =>
-                              b.id === board.id
-                                ? { ...b, email: value }
-                                : b
-                            ),
-                          })
-                        }}
-                        className={`h-8 text-xs ${
-                          emailErrors[board.id]
-                            ? "border-red-500"
-                            : ""
-                        }`}
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={board.enabled}
-                          onCheckedChange={() =>
-                            toggleBoard(floor.id, board.id)
-                          }
-                        />
-                        <span
-                          className={`text-xs font-semibold ${
-                            board.enabled
-                              ? "text-emerald-600"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {board.enabled
-                            ? "Enabled"
-                            : "Disabled"}
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() =>
-                          handleDeleteBoard(board.id)
-                        }
-                        className="text-red-500/80 hover:text-red-600 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-
-        <CardFooter className="flex justify-end">
-          <Button
-            onClick={handleSave}
-            className="bg-emerald-500 text-white hover:bg-emerald-600"
+      <div className="bg-white border rounded-xl p-6 space-y-6">
+        <div className="flex justify-end items-center gap-3">
+          <input
+            type="number"
+            min="1"
+            value={addCount}
+            onChange={(e) => setAddCount(Number(e.target.value))}
+            className="w-20 border rounded-md px-3 py-1.5"
+          />
+          <button
+            onClick={addBoards}
+            className="px-3 py-1.5 border rounded-md"
           >
-            Save changes
-          </Button>
-        </CardFooter>
-      </Card>
+            + Add Board(s)
+          </button>
+        </div>
+
+        {boards.length === 0 ? (
+          <div className="text-gray-500">
+            No boards assigned to this floor yet
+          </div>
+        ) : (
+          <table className="w-full border text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th>#</th>
+                <th>Board ID</th>
+                <th>Serial</th>
+                <th>Email</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {boards.map((board, index) => (
+                <tr key={board.id} className="border-t">
+                  <td>{index + 1}</td>
+                  <td>{board.board_uid || "(new)"}</td>
+                  <td>{board.serial_number || "-"}</td>
+                  <td>
+                    <input
+                      value={board.email || ""}
+                      onChange={(e) =>
+                        updateBoardField(
+                          board.id,
+                          "email",
+                          e.target.value
+                        )
+                      }
+                      className="w-full border rounded-md px-2 py-1"
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={board.enabled}
+                      onChange={(e) =>
+                        updateBoardField(
+                          board.id,
+                          "enabled",
+                          e.target.checked
+                        )
+                      }
+                    />
+                  </td>
+                  <td>
+                    <button
+                      onClick={() => deleteBoard(board.id)}
+                      className="text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }

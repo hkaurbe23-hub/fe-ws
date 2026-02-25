@@ -1,172 +1,175 @@
 "use client"
 
-import { useMemo } from "react"
-import Link from "next/link"
-import { useParams } from "next/navigation"
-import { useFloorsContext } from "@/lib/floor-context"
+import { useEffect, useState } from "react"
+import { useRouter, useParams } from "next/navigation"
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+interface Floor {
+  id: number
+  name: string
+  remarks?: string
+}
 
-import { Button } from "@/components/ui/button"
+interface Board {
+  id: number
+  board_uid: string
+  serial_number: string
+  floor_id: number | null
+  email: string | null
+  enabled: boolean
+}
 
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+const API = "https://api.wattsense.in/api"
 
-import { Input } from "@/components/ui/input"
+export default function ViewFloorPage() {
+  const router = useRouter()
+  const params = useParams()
+  const floorId = Number(params?.floorId)
 
-export default function FloorDetailsPage() {
-  const params = useParams<{ floorId: string }>()
-  const floorId = params.floorId
+  const [floor, setFloor] = useState<Floor | null>(null)
+  const [boards, setBoards] = useState<Board[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // 🔥 NEW → boards directly from backend context
-  const { boards } = useFloorsContext()
+  useEffect(() => {
+    if (!floorId) return
 
-  /**
-   * NOTE:
-   * Backend me ab floors exist nahi karte.
-   * Agar future me floor mapping add karni ho to
-   * boards me floor_id add hoga.
-   *
-   * Filhaal → sab boards show kar rahe.
-   */
-  const floorBoards = useMemo(() => {
-    return boards
-  }, [boards])
+    async function fetchData() {
+      try {
+        setLoading(true)
+        setError(null)
 
-  const boardCount = floorBoards.length
+        console.log("📡 Loading data for floor:", floorId)
+
+        // 🔹 Load all floors
+        const floorRes = await fetch(`${API}/floors`)
+        if (!floorRes.ok) throw new Error("Failed to load floors")
+        const floorsData: Floor[] = await floorRes.json()
+
+        const selectedFloor = floorsData.find(
+          (f) => Number(f.id) === Number(floorId)
+        )
+
+        setFloor(selectedFloor || null)
+
+        // 🔹 Load all boards
+        const boardRes = await fetch(`${API}/boards`)
+        if (!boardRes.ok) throw new Error("Failed to load boards")
+        const boardsData: Board[] = await boardRes.json()
+
+        console.log("✅ Total boards from backend:", boardsData.length)
+
+        // 🔹 Filter boards by floor
+        const filteredBoards = boardsData.filter(
+          (b) => String(b.floor_id) === String(floorId)
+        )
+
+        console.log("✅ Filtered boards:", filteredBoards.length)
+
+        setBoards(filteredBoards)
+      } catch (err) {
+        console.error("❌ Load error:", err)
+        setError(err instanceof Error ? err.message : "Failed to load data")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchData()
+  }, [floorId])
+
+  if (loading)
+    return (
+      <div className="p-6 text-gray-500">
+        Loading floor and boards...
+      </div>
+    )
+
+  if (error) {
+    return (
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {error}
+        </div>
+        <button
+          onClick={() => router.back()}
+          className="mt-4 px-4 py-2 border rounded-md"
+        >
+          Back
+        </button>
+      </div>
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* HEADER */}
-      <div className="flex items-center justify-between rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-        <div>
-          <h1 className="text-base font-semibold text-sky-900">
-            Board Details
-          </h1>
-        </div>
-
-        <Button variant="outline" size="sm" asChild>
-          <Link href="/dashboard/boards">Back</Link>
-        </Button>
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">
+          {floor?.name || "Floor Details"}
+        </h1>
+        <button
+          onClick={() => router.back()}
+          className="px-4 py-2 border rounded-md"
+        >
+          Back
+        </button>
       </div>
 
-      {/* DETAILS CARD */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-semibold">
-            Details
-          </CardTitle>
-        </CardHeader>
+      <div className="bg-white border rounded-xl p-6 space-y-4">
+        <div>
+          <strong>Floor Name:</strong> {floor?.name || "-"}
+        </div>
 
-        <CardContent className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-xs text-muted-foreground">
-                Floor
-              </label>
+        <div>
+          <strong>Remarks:</strong> {floor?.remarks || "-"}
+        </div>
 
-              <Input
-                value={floorId}
-                readOnly
-                className="h-9 text-sm"
-              />
-            </div>
+        <div>
+          <strong>No. of Boards:</strong> {boards.length}
+        </div>
 
-            <div>
-              <label className="text-xs text-muted-foreground">
-                No. of Boards
-              </label>
-
-              <Input
-                value={boardCount}
-                readOnly
-                className="h-9 w-32 text-sm"
-              />
-            </div>
+        {boards.length === 0 ? (
+          <div className="text-gray-500 py-4">
+            No boards assigned to this floor yet.
           </div>
-
-          {/* TABLE */}
-          <div className="overflow-x-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Board UID</TableHead>
-                  <TableHead>Serial Number</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead className="text-right">
-                    Status
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-
-              <TableBody>
-                {floorBoards.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="p-6 text-center text-sm text-muted-foreground"
+        ) : (
+          <table className="w-full border text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="p-3 text-left">#</th>
+                <th className="p-3 text-left">Board ID</th>
+                <th className="p-3 text-left">Serial</th>
+                <th className="p-3 text-left">Email</th>
+                <th className="p-3 text-left">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {boards.map((board, index) => (
+                <tr key={board.id} className="border-t hover:bg-gray-50">
+                  <td className="p-3">{index + 1}</td>
+                  <td className="p-3 font-mono text-sm">
+                    {board.board_uid}
+                  </td>
+                  <td className="p-3 font-mono text-sm">
+                    {board.serial_number}
+                  </td>
+                  <td className="p-3">{board.email || "-"}</td>
+                  <td className="p-3">
+                    <span
+                      className={`px-2 py-1 rounded text-xs font-semibold ${
+                        board.enabled
+                          ? "bg-green-100 text-green-700"
+                          : "bg-red-100 text-red-700"
+                      }`}
                     >
-                      No boards found.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  floorBoards.map((board, index) => (
-                    <TableRow key={board.id}>
-                      <TableCell>{index + 1}</TableCell>
-
-                      {/* UID */}
-                      <TableCell className="font-mono text-xs">
-                        {board.board_uid}
-                      </TableCell>
-
-                      {/* SERIAL */}
-                      <TableCell className="font-mono text-xs">
-                        {board.serial_number}
-                      </TableCell>
-
-                      {/* EMAIL */}
-                      <TableCell className="text-sm">
-                        {board.email || (
-                          <span className="italic text-muted-foreground">
-                            No email
-                          </span>
-                        )}
-                      </TableCell>
-
-                      {/* STATUS */}
-                      <TableCell className="text-right">
-                        <span
-                          className={`text-xs font-semibold ${
-                            board.enabled
-                              ? "text-emerald-600"
-                              : "text-red-500"
-                          }`}
-                        >
-                          {board.enabled
-                            ? "Enabled"
-                            : "Disabled"}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      {board.enabled ? "Enabled" : "Disabled"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
