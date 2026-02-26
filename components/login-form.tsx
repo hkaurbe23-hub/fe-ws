@@ -1,37 +1,74 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Eye, EyeOff, Zap } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useAuth } from "@/lib/auth-context"
-import { signIn } from "next-auth/react"   // ✅ Added
+import { signIn } from "next-auth/react"
 
 export function LoginForm() {
-  const { login, loginWithGoogle, isLoading } = useAuth()
+  const router = useRouter()
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
 
+  // ✅ UPDATED MANUAL LOGIN (Backend JWT)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+
     if (!email || !password) {
       setError("Please fill in all fields.")
       return
     }
+
     try {
-      await login(email, password)
-    } catch {
-      setError("Invalid credentials. Please try again.")
+      setIsLoading(true)
+
+      const res = await fetch(
+        "https://api.wattsense.in/api/auth/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        }
+      )
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setError(data.error || "Invalid credentials.")
+        return
+      }
+
+      // ✅ Save JWT & role
+      localStorage.setItem("jwtToken", data.token)
+      localStorage.setItem("userRole", data.user.role)
+      localStorage.setItem("userEmail", data.user.email)
+
+      // ✅ Role-based redirect
+      if (data.user.role === "admin") {
+        router.push("/dashboard")
+      } else {
+        router.push("/user")
+      }
+
+    } catch (err) {
+      setError("Login failed. Please try again.")
+    } finally {
+      setIsLoading(false)
     }
   }
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-background px-4">
-      {/* Background accent */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 size-96 rounded-full bg-primary/5 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 size-96 rounded-full bg-primary/5 blur-3xl" />
@@ -39,7 +76,6 @@ export function LoginForm() {
 
       <div className="relative w-full max-w-sm">
 
-        {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
           <div className="flex size-14 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/25">
             <Zap className="size-7 text-primary-foreground" />
@@ -54,12 +90,10 @@ export function LoginForm() {
           </div>
         </div>
 
-        {/* Login Card */}
         <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
 
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-            {/* Email */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email Address
@@ -75,7 +109,6 @@ export function LoginForm() {
               />
             </div>
 
-            {/* Password */}
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="password" className="text-sm font-medium text-foreground">
                 Password
@@ -106,12 +139,10 @@ export function LoginForm() {
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
 
-            {/* Forgot */}
             <div className="flex justify-end">
               <button
                 type="button"
@@ -121,7 +152,6 @@ export function LoginForm() {
               </button>
             </div>
 
-            {/* Sign In */}
             <Button
               type="submit"
               className="h-10 w-full bg-primary text-primary-foreground hover:bg-primary/90"
@@ -130,7 +160,6 @@ export function LoginForm() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
 
-            {/* Divider */}
             <div className="relative my-1">
               <div className="absolute inset-0 flex items-center">
                 <span className="w-full border-t border-border" />
@@ -142,12 +171,12 @@ export function LoginForm() {
               </div>
             </div>
 
-            {/* GOOGLE BUTTON — UPDATED */}
+            {/* ✅ GOOGLE UNTOUCHED */}
             <Button
               type="button"
               variant="outline"
               className="h-10 w-full gap-2 border-border text-foreground"
-              onClick={() => signIn("google", { callbackUrl: "/dashboard" })}
+              onClick={() => signIn("google", { callbackUrl: "/user" })}
             >
               <svg className="size-4" viewBox="0 0 24 24">
                 <path
@@ -176,4 +205,3 @@ export function LoginForm() {
     </div>
   )
 }
-

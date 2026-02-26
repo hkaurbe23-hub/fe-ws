@@ -81,19 +81,39 @@ export default function BoardsPage() {
     }
   }
 
-  async function deleteFloor(id: number) {
-    if (!confirm("Delete this floor?")) return
+  // ✅ YOUR PROVIDED FUNCTION ADDED — NOTHING ELSE CHANGED
+  const deleteFloor = async (id: number) => {
+    const token = localStorage.getItem("jwtToken")
+
+    if (!token) {
+      alert("Login again")
+      return
+    }
 
     try {
-      const res = await fetch(`${API}/floors/${id}`, { method: "DELETE" })
-      if (!res.ok) throw new Error("Failed to delete floor")
+      const res = await fetch(
+        `https://api.wattsense.in/api/floors/${id}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
 
-      // Immediately update UI
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data?.error || "Delete failed")
+        return
+      }
+
+      // Remove deleted floor from UI
       setFloors((prev) => prev.filter((f) => f.id !== id))
-      setBoards((prev) => prev.filter((b) => Number(b.floor_id) !== id))
+
     } catch (err) {
-      console.error("Delete floor error:", err)
-      alert("Failed to delete floor")
+      console.error("Floor delete error:", err)
+      alert("Something went wrong")
     }
   }
 
@@ -133,6 +153,7 @@ export default function BoardsPage() {
         </div>
       ) : (
         <div className="space-y-4">
+
           {floors.map((floor) => {
             const floorBoards = getBoardsByFloor(floor.id)
 

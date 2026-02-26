@@ -52,7 +52,21 @@ export default function ViewFloorPage() {
         setFloor(selectedFloor || null)
 
         // 🔹 Load all boards
-        const boardRes = await fetch(`${API}/boards`)
+       const token =
+  typeof window !== "undefined"
+    ? localStorage.getItem("jwtToken")
+    : null
+
+const boardRes = await fetch(`${API}/boards`, {
+  headers: token
+    ? {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      }
+    : {
+        "Content-Type": "application/json",
+      },
+})
         if (!boardRes.ok) throw new Error("Failed to load boards")
         const boardsData: Board[] = await boardRes.json()
 

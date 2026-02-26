@@ -7,6 +7,8 @@ import ProfileDropdown from "./ProfileDropdown"
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
 
+const API = process.env.NEXT_PUBLIC_API_URL
+
 type Board = {
   id: number
   board_uid: string
@@ -29,28 +31,47 @@ export default function UserDashboard() {
   const [floors, setFloors] = useState<Floor[]>([])
   const [loading, setLoading] = useState(true)
 
-  // 🔐 If not logged in → redirect
+  const jwtToken =
+    typeof window !== "undefined"
+      ? localStorage.getItem("jwtToken")
+      : null
+
+  const userEmail =
+    typeof window !== "undefined"
+      ? localStorage.getItem("userEmail") || session?.user?.email
+      : session?.user?.email
+
+  // 🔐 Protect route
   useEffect(() => {
     if (status === "loading") return
 
-    if (!session?.user?.email) {
+    if (!jwtToken && !session?.user?.email) {
       router.replace("/login")
     }
-  }, [session, status, router])
+  }, [session, status, router, jwtToken])
 
-  // 📦 Fetch boards from backend
+  // 📦 Fetch Boards
   useEffect(() => {
-    if (!session?.user?.email) return
+    if (!userEmail) return
 
     const fetchBoards = async () => {
       try {
-        const res = await fetch(
-          "https://api.wattsense.in/api/boards"
-        )
+        const res = await fetch(`${API}/api/boards`, {
+          headers: jwtToken
+            ? {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${jwtToken}`,
+              }
+            : {},
+        })
+
+        if (!res.ok) {
+          console.warn("Boards fetch failed:", res.status)
+          setBoards([])
+          return
+        }
 
         const data: Board[] = await res.json()
-
-        const userEmail = session.user.email
 
         const filteredBoards = data.filter(
           (board) =>
@@ -67,15 +88,13 @@ export default function UserDashboard() {
     }
 
     fetchBoards()
-  }, [session])
+  }, [session, jwtToken, userEmail])
 
-  // 🏢 Fetch floors (for correct floor name mapping)
+  // 🏢 Fetch Floors
   useEffect(() => {
     const fetchFloors = async () => {
       try {
-        const res = await fetch(
-          "https://api.wattsense.in/api/floors"
-        )
+        const res = await fetch(`${API}/api/floors`)
         const data = await res.json()
         setFloors(data)
       } catch (error) {
@@ -86,14 +105,23 @@ export default function UserDashboard() {
     fetchFloors()
   }, [])
 
-  // ✅ UPDATED DOWNLOAD FUNCTION (Excel from backend export API)
   const handleDownload = async () => {
-    if (!session?.user?.email) return
+    if (!userEmail) return
 
     try {
       const res = await fetch(
-        `https://api.wattsense.in/api/boards/export/user-data/${session.user.email}`
+        `${API}/api/boards/export/user-data/${userEmail}`,
+        {
+          headers: jwtToken
+            ? { Authorization: `Bearer ${jwtToken}` }
+            : {},
+        }
       )
+
+      if (!res.ok) {
+        alert("Download failed")
+        return
+      }
 
       const data = await res.json()
 
@@ -104,7 +132,6 @@ export default function UserDashboard() {
 
       const worksheet = XLSX.utils.json_to_sheet(data)
       const workbook = XLSX.utils.book_new()
-
       XLSX.utils.book_append_sheet(workbook, worksheet, "User Data")
 
       const excelBuffer = XLSX.write(workbook, {
@@ -131,14 +158,10 @@ export default function UserDashboard() {
     )
   }
 
-  if (!session?.user?.email) return null
-
-  // ✅ FIXED GROUPING (floor_id → floor.name mapping)
   const grouped = boards.reduce((acc: any, board) => {
     const floorObj = floors.find(
       (f) => f.id === board.floor_id
     )
-
     const floorName = floorObj?.name || "Unassigned"
 
     if (!acc[floorName]) acc[floorName] = []
@@ -148,21 +171,18 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-8">
-      {/* Header */}
       <div className="flex justify-between mb-10">
         <div>
-          <h1 className="text-3xl font-semibold">
-            My Dashboard
-          </h1>
+          <h1 className="text-3xl font-semibold">My Dashboard</h1>
           <p className="text-gray-500 mt-2">
-            Email: {session.user.email}
+            Email: {userEmail}
           </p>
           <p className="mt-1 font-medium">
             Total Boards: {boards.length}
           </p>
         </div>
 
-        <ProfileDropdown email={session.user.email} />
+        <ProfileDropdown email={userEmail || ""} />
       </div>
 
       {boards.length > 0 && (
@@ -174,21 +194,10 @@ export default function UserDashboard() {
         </button>
       )}
 
-      {boards.length === 0 && (
-        <div className="bg-white p-6 rounded-lg shadow border text-gray-500">
-          No boards assigned to your account.
-        </div>
-      )}
-
       <div className="space-y-8">
         {Object.entries(grouped).map(([floor, boards]: any) => (
-          <div
-            key={floor}
-            className="bg-white rounded-lg shadow border p-6"
-          >
-            <h2 className="text-xl font-semibold mb-4">
-              {floor}
-            </h2>
+          <div key={floor} className="bg-white rounded-lg shadow border p-6">
+            <h2 className="text-xl font-semibold mb-4">{floor}</h2>
 
             <div className="space-y-3">
               {boards.map((board: Board) => (
@@ -197,9 +206,7 @@ export default function UserDashboard() {
                   className="flex justify-between items-center bg-gray-100 p-4 rounded-md"
                 >
                   <div>
-                    <p className="font-medium">
-                      {board.board_uid}
-                    </p>
+                    <p className="font-medium">{board.board_uid}</p>
                     <p className="text-sm text-gray-500">
                       Serial: {board.serial_number}
                     </p>

@@ -27,11 +27,13 @@ export function Topbar() {
         .toUpperCase()
     : "U"
 
-  const handleLogout = async () => {
-    await signOut({
-      callbackUrl: "/login",
-    })
-  }
+const handleLogout = async () => {
+  localStorage.removeItem("jwtToken")
+  localStorage.removeItem("userRole")
+  localStorage.removeItem("userEmail")
+
+  await signOut({ callbackUrl: "/login" })
+}
 
   return (
     <header className="flex h-14 items-center gap-3 border-b border-border bg-card px-4">
@@ -55,18 +57,34 @@ export function Topbar() {
             </span>
           </Button>
         </DropdownMenuTrigger>
+
         <DropdownMenuContent align="end" className="w-52">
           <DropdownMenuLabel className="flex flex-col">
             <span className="text-sm font-medium text-foreground">{user?.name}</span>
             <span className="text-xs text-muted-foreground">{user?.email}</span>
           </DropdownMenuLabel>
+
           <DropdownMenuSeparator />
+
           <DropdownMenuItem className="gap-2">
             <User className="size-4" />
             Profile
           </DropdownMenuItem>
+
+          <DropdownMenuItem
+            onClick={() => window.location.href = "/user"}
+            className="gap-2"
+          >
+            <User className="size-4" />
+            Login as User
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout} className="gap-2 text-destructive">
+
+          <DropdownMenuItem
+            onClick={handleLogout}
+            className="gap-2 text-destructive"
+          >
             <LogOut className="size-4" />
             Log out
           </DropdownMenuItem>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
@@ -21,32 +21,77 @@ export default function DashboardLayout({
 }) {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [authorized, setAuthorized] = useState(false)
+  const [checkingToken, setCheckingToken] = useState(true)
 
   useEffect(() => {
     if (status === "loading") return
 
-    if (!session?.user?.email) {
-      router.replace("/login")
-      return
+    const googleEmail = session?.user?.email
+    const jwtRole = localStorage.getItem("userRole")
+    const existingToken = localStorage.getItem("jwtToken")
+
+    const setupAuth = async () => {
+      try {
+        // 🔹 1. If Google login & no JWT → get JWT from backend
+        if (googleEmail && !existingToken) {
+          const res = await fetch(
+            "https://api.wattsense.in/api/auth/google",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                email: googleEmail,
+              }),
+            }
+          )
+
+          const data = await res.json()
+
+          if (data.token) {
+            localStorage.setItem("jwtToken", data.token)
+
+            // Optional: decode role if backend sends it separately
+            // Otherwise role logic can rely on email list
+          }
+        }
+
+        // 🔹 2. Admin check (Manual JWT role)
+        if (jwtRole === "admin") {
+          setAuthorized(true)
+          setCheckingToken(false)
+          return
+        }
+
+        // 🔹 3. Admin check (Google email whitelist)
+        if (googleEmail && ADMIN_EMAILS.includes(googleEmail)) {
+          setAuthorized(true)
+          setCheckingToken(false)
+          return
+        }
+
+        // 🔹 4. Not admin → redirect
+        router.replace("/user")
+      } catch (err) {
+        console.error("Auth setup failed:", err)
+        router.replace("/login")
+      } finally {
+        setCheckingToken(false)
+      }
     }
 
-   if (!ADMIN_EMAILS.includes(session.user.email)) {
-      router.replace("/user")
-    }
+    setupAuth()
   }, [session, status, router])
 
-  if (status === "loading") {
+  if (status === "loading" || checkingToken || !authorized) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-background">
         <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
-
-  // Prevent flash before redirect
-  if (!session?.user?.email || !ADMIN_EMAILS.includes(session.user.email)) {
-  return null
-}
 
   return (
     <FloorsProvider>

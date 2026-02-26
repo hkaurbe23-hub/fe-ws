@@ -1,6 +1,12 @@
 "use client"
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react"
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from "react"
 
 export type UserRole = "admin" | "user"
 
@@ -8,7 +14,6 @@ export interface User {
   id: string
   email: string
   name: string
-  avatar?: string
   role: UserRole
 }
 
@@ -29,54 +34,78 @@ export function useAuth() {
   return ctx
 }
 
-const MOCK_USER: User = {
-  id: "usr_001",
-  email: "admin@wattsense.io",
-  name: "Admin User",
-  role: "admin",
-}
+const API = process.env.NEXT_PUBLIC_API_URL
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
+  // 🔁 Restore user from localStorage on refresh
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? sessionStorage.getItem("ws_user") : null
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored))
-      } catch {
-        sessionStorage.removeItem("ws_user")
-      }
+    if (typeof window === "undefined") return
+
+    const token = localStorage.getItem("jwtToken")
+    const email = localStorage.getItem("userEmail")
+    const role = localStorage.getItem("userRole") as UserRole | null
+
+    if (token && email && role) {
+      setUser({
+        id: email,
+        email,
+        name: email,
+        role,
+      })
     }
+
     setIsLoading(false)
   }, [])
 
-  const login = useCallback(async (email: string, _password: string) => {
+  // 🔐 Manual Login (Backend)
+  const login = useCallback(async (email: string, password: string) => {
     setIsLoading(true)
-    // Simulate API delay
-    await new Promise((r) => setTimeout(r, 800))
-    const loggedUser: User = { ...MOCK_USER, email }
+
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
+    })
+
+    if (!res.ok) {
+      setIsLoading(false)
+      throw new Error("Invalid credentials")
+    }
+
+    const data = await res.json()
+
+    // ✅ Save JWT + role
+    localStorage.setItem("jwtToken", data.token)
+    localStorage.setItem("userEmail", data.user.email)
+    localStorage.setItem("userRole", data.user.role)
+
+    const loggedUser: User = {
+      id: data.user.email,
+      email: data.user.email,
+      name: data.user.email,
+      role: data.user.role,
+    }
+
     setUser(loggedUser)
-    sessionStorage.setItem("ws_user", JSON.stringify(loggedUser))
     setIsLoading(false)
   }, [])
 
+  // 🌐 Google handled via NextAuth
   const loginWithGoogle = useCallback(() => {
-    // In production, this would redirect to Google OAuth
-    // For demo, simulate a Google sign-in
-    const googleUser: User = {
-      ...MOCK_USER,
-      email: "admin@gmail.com",
-      name: "Google Admin",
-    }
-    setUser(googleUser)
-    sessionStorage.setItem("ws_user", JSON.stringify(googleUser))
+    // Google login handled separately
   }, [])
 
+  // 🚪 Logout
   const logout = useCallback(() => {
+    localStorage.removeItem("jwtToken")
+    localStorage.removeItem("userEmail")
+    localStorage.removeItem("userRole")
     setUser(null)
-    sessionStorage.removeItem("ws_user")
   }, [])
 
   return (

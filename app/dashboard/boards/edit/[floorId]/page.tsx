@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { Trash2 } from "lucide-react"
+import { loadAllBoards } from "@/lib/load-boards"
 
 interface Board {
   id: number | string
@@ -35,26 +36,42 @@ export default function EditFloorPage() {
       return
     }
 
+    const API = process.env.NEXT_PUBLIC_API_URL
+
     async function fetchBoards() {
       try {
-        setLoading(true)
-        setError(null)
+        const token =
+          typeof window !== "undefined"
+            ? localStorage.getItem("jwtToken")
+            : null
 
-        const res = await fetch(`${API}/boards`)
-        if (!res.ok) throw new Error("Failed to load boards")
+        const res = await fetch(`${API}/api/boards`, {
+          headers: token
+            ? {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              }
+            : {
+                "Content-Type": "application/json",
+              },
+        })
+
+        if (!res.ok) {
+          throw new Error("Failed to load boards")
+        }
 
         const data: Board[] = await res.json()
 
+        // ✅ ONLY change: filter + setBoards
         const filtered = data.filter(
-          (b) => String(b.floor_id) === String(floorId)
+          (b) => Number(b.floor_id) === floorId
         )
 
         setBoards(filtered)
       } catch (err) {
-        console.error(err)
         setError("Failed to load boards")
       } finally {
-        setLoading(false)
+        setLoading(false) // ✅ IMPORTANT FIX
       }
     }
 
@@ -92,83 +109,106 @@ export default function EditFloorPage() {
     )
   }
 
-  // 🔹 Delete board
-  async function deleteBoard(id: number | string) {
-    if (typeof id === "string") {
-      setBoards((prev) => prev.filter((b) => b.id !== id))
-      return
-    }
+  const deleteBoard = async (id: number) => {
+  const token = localStorage.getItem("jwtToken")
 
-    if (!confirm("Delete this board permanently?")) return
-
-    try {
-      const res = await fetch(`${API}/boards/${id}`, {
-        method: "DELETE",
-      })
-
-      if (!res.ok) throw new Error("Delete failed")
-
-      setBoards((prev) => prev.filter((b) => b.id !== id))
-    } catch (err) {
-      alert("Failed to delete board")
-    }
+  if (!token) {
+    alert("Please login again")
+    return
   }
 
-  // 🔹 Save Changes
-  async function saveChanges() {
-    try {
-      setSaving(true)
+  const res = await fetch(
+    `https://api.wattsense.in/api/boards/${id}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  )
 
-      for (const board of boards) {
-        // CREATE
-        if (board.isNew) {
-          const res = await fetch(`${API}/boards/register`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email: board.email || "",
-              floor_id: floorId,
-            }),
-          })
+  const data = await res.json()
 
-          if (!res.ok) {
-            alert("Board create failed")
-            setSaving(false)
-            return
-          }
-        }
-        // UPDATE
-        else {
-          const res = await fetch(`${API}/boards/${board.id}`, {
-            method: "PATCH",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              email: board.email,
-              enabled: board.enabled,
-            }),
-          })
+  if (!res.ok) {
+    alert(data.error || "Delete failed")
+    return
+  }
 
-          if (!res.ok) {
-            alert("Board update failed")
-            setSaving(false)
-            return
-          }
+  setBoards(prev => prev.filter(b => b.id !== id))
+}
+
+// 🔹 Save Changes
+async function saveChanges() {
+  try {
+    setSaving(true)
+
+    const token =
+      typeof window !== "undefined"
+        ? localStorage.getItem("jwtToken")
+        : null
+
+    for (const board of boards) {
+
+      // ✅ CREATE
+      if (board.isNew) {
+        const res = await fetch(`${API}/boards/register`, {
+          method: "POST",
+          headers: token
+            ? {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              }
+            : {
+                "Content-Type": "application/json",
+              },
+          body: JSON.stringify({
+            email: board.email || "",
+            floor_id: floorId,
+          }),
+        })
+
+        if (!res.ok) {
+          alert("Board create failed")
+          setSaving(false)
+          return
         }
       }
 
-      alert("Saved successfully ✅")
-      window.location.reload()
-    } catch (err) {
-      console.error(err)
-      alert("Error saving boards")
-    } finally {
-      setSaving(false)
+      // ✅ UPDATE (existing boards)
+      else {
+        const res = await fetch(`${API}/boards/${board.id}`, {
+          method: "PATCH",
+          headers: token
+            ? {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              }
+            : {
+                "Content-Type": "application/json",
+              },
+          body: JSON.stringify({
+            email: board.email,
+            enabled: board.enabled,
+          }),
+        })
+
+        if (!res.ok) {
+          alert("Board update failed")
+          setSaving(false)
+          return
+        }
+      }
     }
+
+    alert("Saved successfully ✅")
+    window.location.reload()
+  } catch (err) {
+    console.error(err)
+    alert("Error saving boards")
+  } finally {
+    setSaving(false)
   }
+}
 
   if (loading)
     return <div className="p-6 text-gray-500">Loading boards...</div>
