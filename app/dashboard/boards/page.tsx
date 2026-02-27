@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { MoreVertical } from "lucide-react"
 import { loadAllBoards } from "@/lib/load-boards"
+import * as XLSX from "xlsx"
+import { saveAs } from "file-saver"
 
 interface Floor {
   id: number
@@ -31,7 +33,6 @@ export default function BoardsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Load floors and boards on mount
   useEffect(() => {
     refreshData()
   }, [])
@@ -40,13 +41,11 @@ export default function BoardsPage() {
     setLoading(true)
     setError(null)
     try {
-      // Load floors
       const floorsRes = await fetch(`${API}/floors`)
       if (!floorsRes.ok) throw new Error("Failed to load floors")
       const floorsData = await floorsRes.json()
       setFloors(floorsData)
 
-      // Load boards using the optimized utility function
       const boardsData = await loadAllBoards()
       setBoards(boardsData)
     } catch (err) {
@@ -59,6 +58,68 @@ export default function BoardsPage() {
 
   function getBoardsByFloor(floorId: number) {
     return boards.filter((b) => Number(b.floor_id) === Number(floorId))
+  }
+
+  async function handlePrint(floorId: number, floorName: string) {
+    const token = localStorage.getItem("jwtToken")
+    const floorBoards = getBoardsByFloor(floorId)
+
+    const uniqueEmails = [
+      ...new Set(
+        floorBoards
+          .map((b) => b.email)
+          .filter((email): email is string => !!email)
+      ),
+    ]
+
+    if (uniqueEmails.length === 0) {
+      alert("No data available for export")
+      return
+    }
+
+    try {
+      let allData: any[] = []
+
+      for (const email of uniqueEmails) {
+        const res = await fetch(
+          `${API}/api/boards/export/user-data/${email}`,
+          {
+            headers: token
+              ? { Authorization: `Bearer ${token}` }
+              : {},
+          }
+        )
+
+        if (!res.ok) continue
+
+        const data = await res.json()
+        allData = [...allData, ...data]
+      }
+
+      if (!allData.length) {
+        alert("No data available for export")
+        return
+      }
+
+      const worksheet = XLSX.utils.json_to_sheet(allData)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, floorName)
+
+      const excelBuffer = XLSX.write(workbook, {
+        bookType: "xlsx",
+        type: "array",
+      })
+
+      const blob = new Blob([excelBuffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      })
+
+      saveAs(blob, `${floorName}_Boards.xlsx`)
+
+    } catch (error) {
+      console.error("Export failed:", error)
+      alert("Export failed")
+    }
   }
 
   async function addFloor() {
@@ -81,7 +142,6 @@ export default function BoardsPage() {
     }
   }
 
-  // ✅ YOUR PROVIDED FUNCTION ADDED — NOTHING ELSE CHANGED
   const deleteFloor = async (id: number) => {
     const token = localStorage.getItem("jwtToken")
 
@@ -108,7 +168,6 @@ export default function BoardsPage() {
         return
       }
 
-      // Remove deleted floor from UI
       setFloors((prev) => prev.filter((f) => f.id !== id))
 
     } catch (err) {
@@ -153,7 +212,6 @@ export default function BoardsPage() {
         </div>
       ) : (
         <div className="space-y-4">
-
           {floors.map((floor) => {
             const floorBoards = getBoardsByFloor(floor.id)
 
@@ -187,9 +245,7 @@ export default function BoardsPage() {
                       <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-md z-10">
                         <button
                           onClick={() =>
-                            router.push(
-                              `/dashboard/boards/${floor.id}`
-                            )
+                            router.push(`/dashboard/boards/${floor.id}`)
                           }
                           className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                         >
@@ -197,9 +253,7 @@ export default function BoardsPage() {
                         </button>
                         <button
                           onClick={() =>
-                            router.push(
-                              `/dashboard/boards/edit/${floor.id}`
-                            )
+                            router.push(`/dashboard/boards/edit/${floor.id}`)
                           }
                           className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                         >
@@ -212,7 +266,7 @@ export default function BoardsPage() {
                           Delete
                         </button>
                         <button
-                          onClick={() => window.print()}
+                          onClick={() => handlePrint(floor.id, floor.name)}
                           className="block w-full text-left px-4 py-2 hover:bg-gray-100"
                         >
                           Print

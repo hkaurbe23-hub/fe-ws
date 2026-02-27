@@ -279,19 +279,16 @@ export default function EditFloorPage() {
                     <td>{index + 1}</td>
                     <td>{board.board_uid || "(new)"}</td>
                     <td>{board.serial_number || "-"}</td>
+
+                    {/* ✅ EMAIL NOW NON-EDITABLE */}
                     <td>
                       <input
                         value={board.email || ""}
-                        onChange={(e) =>
-                          updateBoardField(
-                            board.id,
-                            "email",
-                            e.target.value
-                          )
-                        }
-                        className="w-full border rounded-md px-2 py-1"
+                        readOnly
+                        className="w-full border rounded-md px-2 py-1 bg-gray-100 cursor-not-allowed"
                       />
                     </td>
+
                     <td>
                       <input
                         type="checkbox"
@@ -305,6 +302,7 @@ export default function EditFloorPage() {
                         }
                       />
                     </td>
+
                     <td>
                       <button
                         onClick={() => deleteBoard(board.id)}

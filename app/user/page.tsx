@@ -239,7 +239,7 @@ export default function UserDashboard() {
   }, {})
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="space-y-8">
       <div className="flex justify-between mb-10">
         <div>
           <h1 className="text-3xl font-semibold">My Dashboard</h1>
