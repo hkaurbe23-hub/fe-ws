@@ -30,11 +30,15 @@ export default function DashboardLayout({
     const googleEmail = session?.user?.email
     const jwtRole = localStorage.getItem("userRole")
     const existingToken = localStorage.getItem("jwtToken")
+    // ✅ Always sync latest Google session email
+if (googleEmail) {
+  localStorage.setItem("userEmail", googleEmail)
+}
 
     const setupAuth = async () => {
       try {
         // 🔹 1. If Google login & no JWT → get JWT from backend
-        if (googleEmail && !existingToken) {
+        if (googleEmail ) {
           const res = await fetch(
             "https://api.wattsense.in/api/auth/google",
             {
@@ -51,11 +55,13 @@ export default function DashboardLayout({
           const data = await res.json()
 
           if (data.token) {
-            localStorage.setItem("jwtToken", data.token)
+  localStorage.setItem("jwtToken", data.token)
 
-            // Optional: decode role if backend sends it separately
-            // Otherwise role logic can rely on email list
-          }
+  // ✅ ADD THIS LINE
+  localStorage.setItem("userEmail", googleEmail)
+
+  // Optional: role logic
+}
         }
 
         // 🔹 2. Admin check (Manual JWT role)

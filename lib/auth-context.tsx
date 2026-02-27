@@ -1,5 +1,5 @@
 "use client"
-
+import { signOut } from "next-auth/react"
 import React, {
   createContext,
   useContext,
@@ -101,12 +101,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // 🚪 Logout
-  const logout = useCallback(() => {
-    localStorage.removeItem("jwtToken")
-    localStorage.removeItem("userEmail")
-    localStorage.removeItem("userRole")
-    setUser(null)
-  }, [])
+  const logout = useCallback(async () => {
+  localStorage.removeItem("jwtToken")
+  localStorage.removeItem("userEmail")
+  localStorage.removeItem("userRole")
+
+  setUser(null)
+
+  // ✅ IMPORTANT — clear NextAuth session
+  await signOut({ redirect: false })
+}, [])
 
   return (
     <AuthContext.Provider
