@@ -15,12 +15,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { usePathname } from "next/navigation"
 
 export function Topbar() {
   const { user } = useAuth()
   const { data: session } = useSession()
+  const pathname = usePathname()
 
-  // 🔥 Always prefer Google session email if exists
   const displayEmail =
     session?.user?.email || user?.email || "User"
 
@@ -35,6 +36,16 @@ export function Topbar() {
     localStorage.removeItem("userEmail")
 
     await signOut({ callbackUrl: "/login" })
+  }
+
+  const isUserPage = pathname.startsWith("/user")
+
+  const handleRoleSwitch = () => {
+    if (isUserPage) {
+      window.location.href = "/dashboard"
+    } else {
+      window.location.href = "/user"
+    }
   }
 
   return (
@@ -78,11 +89,11 @@ export function Topbar() {
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            onClick={() => (window.location.href = "/user")}
+            onClick={handleRoleSwitch}
             className="gap-2"
           >
             <User className="size-4" />
-            Login as User
+            {isUserPage ? "Sign in as Admin" : "Login as User"}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
