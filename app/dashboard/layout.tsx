@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useSession } from "next-auth/react"
-import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar"
+import { SidebarProvider } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Topbar } from "@/components/topbar"
 import { Toaster } from "sonner"
@@ -84,8 +84,8 @@ export default function DashboardLayout({
 
   if (status === "loading" || checkingToken || !authorized) {
     return (
-      <div className="flex min-h-svh items-center justify-center bg-background">
-        <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     )
   }
@@ -93,18 +93,26 @@ export default function DashboardLayout({
   return (
     <FloorsProvider>
       <SidebarProvider>
-        <AppSidebar />
-        <SidebarInset>
-          <Topbar />
+        <div className="flex min-h-screen w-full bg-background">
 
-          {/* ✅ FIXED WRAPPER */}
-          <div className="flex-1 overflow-auto">
-            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              {children}
-            </div>
+          {/* Sidebar */}
+          <AppSidebar />
+
+          {/* Main Content Area */}
+          <div className="flex flex-1 flex-col">
+
+            <Topbar />
+
+            {/* Proper centered container */}
+            <main className="flex-1 overflow-auto">
+              <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+                {children}
+              </div>
+            </main>
+
           </div>
+        </div>
 
-        </SidebarInset>
         <Toaster position="bottom-right" richColors />
       </SidebarProvider>
     </FloorsProvider>
