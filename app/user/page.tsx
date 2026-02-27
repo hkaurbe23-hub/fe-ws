@@ -31,6 +31,11 @@ export default function UserDashboard() {
   const [floors, setFloors] = useState<Floor[]>([])
   const [loading, setLoading] = useState(true)
 
+  // ✅ NEW STATES (Claim Board)
+  const [boardUid, setBoardUid] = useState("")
+  const [serialNumber, setSerialNumber] = useState("")
+  const [claimLoading, setClaimLoading] = useState(false)
+
   const jwtToken =
     typeof window !== "undefined"
       ? localStorage.getItem("jwtToken")
@@ -104,6 +109,70 @@ export default function UserDashboard() {
 
     fetchFloors()
   }, [])
+
+  // ✅ NEW FUNCTION (Claim Board)
+  const handleClaimBoard = async () => {
+    if (!boardUid || !serialNumber) {
+      alert("Please enter both Board UID and Serial Number")
+      return
+    }
+
+    if (!jwtToken) {
+      alert("Not authenticated")
+      return
+    }
+
+    try {
+      setClaimLoading(true)
+
+      const res = await fetch(`${API}/api/boards/claim`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwtToken}`,
+        },
+        body: JSON.stringify({
+          board_uid: boardUid,
+          serial_number: serialNumber,
+        }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        alert(data.error || "Claim failed")
+        return
+      }
+
+      alert("Board claimed successfully")
+
+      setBoardUid("")
+      setSerialNumber("")
+
+      // Refresh boards
+      const refresh = await fetch(`${API}/api/boards`, {
+        headers: {
+          Authorization: `Bearer ${jwtToken}`,
+        },
+      })
+
+      const refreshedData: Board[] = await refresh.json()
+
+      const filteredBoards = refreshedData.filter(
+        (board) =>
+          board.email === userEmail &&
+          board.enabled === true
+      )
+
+      setBoards(filteredBoards)
+
+    } catch (err) {
+      console.error("Claim error:", err)
+      alert("Something went wrong")
+    } finally {
+      setClaimLoading(false)
+    }
+  }
 
   const handleDownload = async () => {
     if (!userEmail) return
@@ -183,6 +252,37 @@ export default function UserDashboard() {
         </div>
 
         <ProfileDropdown email={userEmail || ""} />
+      </div>
+
+      {/* ✅ CLAIM BOARD UI */}
+      <div className="bg-white p-6 rounded-lg shadow border mb-8">
+        <h2 className="text-lg font-semibold mb-4">Add New Board</h2>
+
+        <div className="flex flex-col md:flex-row gap-4">
+          <input
+            type="text"
+            placeholder="Board UID"
+            value={boardUid}
+            onChange={(e) => setBoardUid(e.target.value)}
+            className="flex-1 border rounded-md px-4 py-2"
+          />
+
+          <input
+            type="text"
+            placeholder="Serial Number"
+            value={serialNumber}
+            onChange={(e) => setSerialNumber(e.target.value)}
+            className="flex-1 border rounded-md px-4 py-2"
+          />
+
+          <button
+            onClick={handleClaimBoard}
+            disabled={claimLoading}
+            className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 disabled:opacity-50"
+          >
+            {claimLoading ? "Claiming..." : "Claim Board"}
+          </button>
+        </div>
       </div>
 
       {boards.length > 0 && (

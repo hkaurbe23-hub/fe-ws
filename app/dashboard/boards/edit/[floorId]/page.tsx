@@ -28,7 +28,6 @@ export default function EditFloorPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // 🔹 Load boards for this floor
   useEffect(() => {
     if (!floorId) {
       setError("Invalid floor ID")
@@ -62,7 +61,6 @@ export default function EditFloorPage() {
 
         const data: Board[] = await res.json()
 
-        // ✅ ONLY change: filter + setBoards
         const filtered = data.filter(
           (b) => Number(b.floor_id) === floorId
         )
@@ -71,14 +69,13 @@ export default function EditFloorPage() {
       } catch (err) {
         setError("Failed to load boards")
       } finally {
-        setLoading(false) // ✅ IMPORTANT FIX
+        setLoading(false)
       }
     }
 
     fetchBoards()
   }, [floorId])
 
-  // 🔹 Add new temp boards
   function addBoards() {
     const newBoards: Board[] = []
 
@@ -98,7 +95,6 @@ export default function EditFloorPage() {
     setAddCount(1)
   }
 
-  // 🔹 Update field locally
   function updateBoardField(
     id: number | string,
     field: keyof Board,
@@ -110,105 +106,102 @@ export default function EditFloorPage() {
   }
 
   const deleteBoard = async (id: number) => {
-  const token = localStorage.getItem("jwtToken")
+    const token = localStorage.getItem("jwtToken")
 
-  if (!token) {
-    alert("Please login again")
-    return
-  }
-
-  const res = await fetch(
-    `https://api.wattsense.in/api/boards/${id}`,
-    {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+    if (!token) {
+      alert("Please login again")
+      return
     }
-  )
 
-  const data = await res.json()
+    const res = await fetch(
+      `https://api.wattsense.in/api/boards/${id}`,
+      {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
 
-  if (!res.ok) {
-    alert(data.error || "Delete failed")
-    return
+    const data = await res.json()
+
+    if (!res.ok) {
+      alert(data.error || "Delete failed")
+      return
+    }
+
+    setBoards(prev => prev.filter(b => b.id !== id))
   }
 
-  setBoards(prev => prev.filter(b => b.id !== id))
-}
+  async function saveChanges() {
+    try {
+      setSaving(true)
 
-// 🔹 Save Changes
-async function saveChanges() {
-  try {
-    setSaving(true)
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("jwtToken")
+          : null
 
-    const token =
-      typeof window !== "undefined"
-        ? localStorage.getItem("jwtToken")
-        : null
+      for (const board of boards) {
 
-    for (const board of boards) {
+        if (board.isNew) {
+          const res = await fetch(`${API}/boards/register`, {
+            method: "POST",
+            headers: token
+              ? {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                }
+              : {
+                  "Content-Type": "application/json",
+                },
+            body: JSON.stringify({
+              email: board.email || "",
+              floor_id: floorId,
+            }),
+          })
 
-      // ✅ CREATE
-      if (board.isNew) {
-        const res = await fetch(`${API}/boards/register`, {
-          method: "POST",
-          headers: token
-            ? {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              }
-            : {
-                "Content-Type": "application/json",
-              },
-          body: JSON.stringify({
-            email: board.email || "",
-            floor_id: floorId,
-          }),
-        })
+          if (!res.ok) {
+            alert("Board create failed")
+            setSaving(false)
+            return
+          }
+        }
 
-        if (!res.ok) {
-          alert("Board create failed")
-          setSaving(false)
-          return
+        else {
+          const res = await fetch(`${API}/boards/${board.id}`, {
+            method: "PATCH",
+            headers: token
+              ? {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                }
+              : {
+                  "Content-Type": "application/json",
+                },
+            body: JSON.stringify({
+              email: board.email,
+              enabled: board.enabled,
+            }),
+          })
+
+          if (!res.ok) {
+            alert("Board update failed")
+            setSaving(false)
+            return
+          }
         }
       }
 
-      // ✅ UPDATE (existing boards)
-      else {
-        const res = await fetch(`${API}/boards/${board.id}`, {
-          method: "PATCH",
-          headers: token
-            ? {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              }
-            : {
-                "Content-Type": "application/json",
-              },
-          body: JSON.stringify({
-            email: board.email,
-            enabled: board.enabled,
-          }),
-        })
-
-        if (!res.ok) {
-          alert("Board update failed")
-          setSaving(false)
-          return
-        }
-      }
+      alert("Saved successfully ✅")
+      window.location.reload()
+    } catch (err) {
+      console.error(err)
+      alert("Error saving boards")
+    } finally {
+      setSaving(false)
     }
-
-    alert("Saved successfully ✅")
-    window.location.reload()
-  } catch (err) {
-    console.error(err)
-    alert("Error saving boards")
-  } finally {
-    setSaving(false)
   }
-}
 
   if (loading)
     return <div className="p-6 text-gray-500">Loading boards...</div>
@@ -221,14 +214,15 @@ async function saveChanges() {
     )
 
   return (
-    <div className="p-6 space-y-6 text-sm">
-      <div className="flex justify-between items-center">
+    <div className="p-4 sm:p-6 space-y-6 text-sm">
+      
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
         <h1 className="text-xl font-semibold">Edit Board Data</h1>
 
-        <div className="flex gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <button
             onClick={() => router.back()}
-            className="px-4 py-2 border rounded-md"
+            className="w-full sm:w-auto px-4 py-2 border rounded-md"
           >
             Back
           </button>
@@ -236,25 +230,26 @@ async function saveChanges() {
           <button
             onClick={saveChanges}
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
+            className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md"
           >
             {saving ? "Saving..." : "Save"}
           </button>
         </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-6 space-y-6">
-        <div className="flex justify-end items-center gap-3">
+      <div className="bg-white border rounded-xl p-4 sm:p-6 space-y-6">
+
+        <div className="flex flex-col sm:flex-row sm:justify-end sm:items-center gap-3">
           <input
             type="number"
             min="1"
             value={addCount}
             onChange={(e) => setAddCount(Number(e.target.value))}
-            className="w-20 border rounded-md px-3 py-1.5"
+            className="w-full sm:w-20 border rounded-md px-3 py-1.5"
           />
           <button
             onClick={addBoards}
-            className="px-3 py-1.5 border rounded-md"
+            className="w-full sm:w-auto px-3 py-1.5 border rounded-md"
           >
             + Add Board(s)
           </button>
@@ -265,62 +260,64 @@ async function saveChanges() {
             No boards assigned to this floor yet
           </div>
         ) : (
-          <table className="w-full border text-sm">
-            <thead className="bg-gray-50">
-              <tr>
-                <th>#</th>
-                <th>Board ID</th>
-                <th>Serial</th>
-                <th>Email</th>
-                <th>Status</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-
-            <tbody>
-              {boards.map((board, index) => (
-                <tr key={board.id} className="border-t">
-                  <td>{index + 1}</td>
-                  <td>{board.board_uid || "(new)"}</td>
-                  <td>{board.serial_number || "-"}</td>
-                  <td>
-                    <input
-                      value={board.email || ""}
-                      onChange={(e) =>
-                        updateBoardField(
-                          board.id,
-                          "email",
-                          e.target.value
-                        )
-                      }
-                      className="w-full border rounded-md px-2 py-1"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={board.enabled}
-                      onChange={(e) =>
-                        updateBoardField(
-                          board.id,
-                          "enabled",
-                          e.target.checked
-                        )
-                      }
-                    />
-                  </td>
-                  <td>
-                    <button
-                      onClick={() => deleteBoard(board.id)}
-                      className="text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </td>
+          <div className="w-full overflow-x-auto">
+            <table className="min-w-[700px] w-full border text-sm">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th>#</th>
+                  <th>Board ID</th>
+                  <th>Serial</th>
+                  <th>Email</th>
+                  <th>Status</th>
+                  <th>Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+
+              <tbody>
+                {boards.map((board, index) => (
+                  <tr key={board.id} className="border-t">
+                    <td>{index + 1}</td>
+                    <td>{board.board_uid || "(new)"}</td>
+                    <td>{board.serial_number || "-"}</td>
+                    <td>
+                      <input
+                        value={board.email || ""}
+                        onChange={(e) =>
+                          updateBoardField(
+                            board.id,
+                            "email",
+                            e.target.value
+                          )
+                        }
+                        className="w-full border rounded-md px-2 py-1"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="checkbox"
+                        checked={board.enabled}
+                        onChange={(e) =>
+                          updateBoardField(
+                            board.id,
+                            "enabled",
+                            e.target.checked
+                          )
+                        }
+                      />
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => deleteBoard(board.id)}
+                        className="text-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
