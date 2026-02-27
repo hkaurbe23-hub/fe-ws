@@ -25,14 +25,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${inter.variable} font-sans antialiased min-h-screen bg-background`}>
         <Providers>
-          <FloorsProvider>{children}</FloorsProvider>
+          <FloorsProvider>
+            {children}
+          </FloorsProvider>
         </Providers>
         <Analytics />
       </body>
     </html>
   )
 }
-
-

@@ -29,16 +29,14 @@ export default function DashboardLayout({
 
     const googleEmail = session?.user?.email
     const jwtRole = localStorage.getItem("userRole")
-    const existingToken = localStorage.getItem("jwtToken")
-    // ✅ Always sync latest Google session email
-if (googleEmail) {
-  localStorage.setItem("userEmail", googleEmail)
-}
+
+    if (googleEmail) {
+      localStorage.setItem("userEmail", googleEmail)
+    }
 
     const setupAuth = async () => {
       try {
-        // 🔹 1. If Google login & no JWT → get JWT from backend
-        if (googleEmail ) {
+        if (googleEmail) {
           const res = await fetch(
             "https://api.wattsense.in/api/auth/google",
             {
@@ -55,30 +53,23 @@ if (googleEmail) {
           const data = await res.json()
 
           if (data.token) {
-  localStorage.setItem("jwtToken", data.token)
-
-  // ✅ ADD THIS LINE
-  localStorage.setItem("userEmail", googleEmail)
-
-  // Optional: role logic
-}
+            localStorage.setItem("jwtToken", data.token)
+            localStorage.setItem("userEmail", googleEmail)
+          }
         }
 
-        // 🔹 2. Admin check (Manual JWT role)
         if (jwtRole === "admin") {
           setAuthorized(true)
           setCheckingToken(false)
           return
         }
 
-        // 🔹 3. Admin check (Google email whitelist)
         if (googleEmail && ADMIN_EMAILS.includes(googleEmail)) {
           setAuthorized(true)
           setCheckingToken(false)
           return
         }
 
-        // 🔹 4. Not admin → redirect
         router.replace("/user")
       } catch (err) {
         console.error("Auth setup failed:", err)
@@ -105,9 +96,14 @@ if (googleEmail) {
         <AppSidebar />
         <SidebarInset>
           <Topbar />
-          <div className="flex-1 overflow-auto p-4 md:p-6">
-            {children}
+
+          {/* ✅ FIXED WRAPPER */}
+          <div className="flex-1 overflow-auto">
+            <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+              {children}
+            </div>
           </div>
+
         </SidebarInset>
         <Toaster position="bottom-right" richColors />
       </SidebarProvider>
