@@ -1,0 +1,24 @@
+# Query: board.serial
+# ContextLines: 1
+
+4 results - 4 files
+
+app\dashboard\boards\[floorId]\page.tsx:
+  154                        <TableCell className="font-mono text-xs text-foreground">
+  155:                         {board.serial}
+  156                        </TableCell>
+
+app\dashboard\boards\edit\[floorId]\page.tsx:
+  145                      <TableCell className="font-mono text-xs">
+  146:                       {board.serial}
+  147                      </TableCell>
+
+components\boards\board-row.tsx:
+  65        <TableCell className="font-mono text-xs text-foreground">
+  66:         {board.serial}
+  67        </TableCell>
+
+modules\boards\components\floor-row.tsx:
+  156                      <TableCell className="font-mono text-xs text-foreground">
+  157:                       {board.serial}
+  158                      </TableCell>
