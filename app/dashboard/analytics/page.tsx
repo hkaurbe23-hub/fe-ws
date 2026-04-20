@@ -22,7 +22,12 @@ import {
 const API = process.env.NEXT_PUBLIC_API_URL
 
 // ✅ COLORS FOR PIE
-const COLORS = ["#2563eb", "#22c55e", "#f59e0b"]
+const PHASE_COLORS: any = {
+  A: "#ef4444", // red
+  B: "#eab308", // yellow
+  C: "#3b82f6", // blue
+  TOTAL: "#6b7280", // grey
+}
 
 export default function AnalyticsPage() {
   const [boards, setBoards] = useState<any[]>([])
@@ -140,6 +145,8 @@ export default function AnalyticsPage() {
     )
 
     setLoading(false)
+    setOpenBoards(false)
+setOpenSlaves(false)
   }
 
   const latest =
@@ -392,7 +399,7 @@ const buildTHDVoltageData = () => {
               ⚡ {loadType?.toUpperCase()}
             </h2>
             <p className="text-xs text-gray-400 mt-1">
-              Updated: {formatRawTimestamp(data.header?.timestamp)}
+              Updated: {formatRawTimestamp(latest?.timestamp)}
             </p>
           </div>
 
@@ -453,10 +460,12 @@ const buildTHDVoltageData = () => {
 function KPI({ title, data }: any) {
   return (
     <div className="bg-white rounded-2xl shadow p-4">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-blue-600 mt-2">
-        {data?.value ?? 0}
+      <p className="text-xs text-gray-500">{title}</p>
+
+      <p className="text-sm md:text-base font-semibold text-blue-600 mt-1 break-all leading-tight">
+        {data?.value !== undefined ? Number(data.value).toString() : 0}
       </p>
+
       <p className="text-xs text-gray-400">{data?.unit ?? ""}</p>
     </div>
   )
@@ -513,13 +522,13 @@ function PieBlock({ title, data, total }: any) {
               nameKey="name"
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={90}
+              innerRadius="55%"
+outerRadius="80%"
               label={({ value }) => `${value}`} // ✅ keep your current behavior
             >
-              {data.map((_: any, index: number) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
+             {data.map((entry: any, index: number) => (
+  <Cell key={index} fill={PHASE_COLORS[entry.name] || "#999"} />
+))}
             </Pie>
 
             {/* ✅ CENTER VALUE (unchanged) */}
@@ -528,7 +537,7 @@ function PieBlock({ title, data, total }: any) {
               y="45%"
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-lg font-bold fill-gray-800"
+             className="text-sm md:text-base font-semibold fill-gray-800"
             >
               {total?.value ?? 0}
             </text>
@@ -538,7 +547,7 @@ function PieBlock({ title, data, total }: any) {
               y="60%"
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-sm fill-gray-400"
+              className="text-xs fill-gray-400"
             >
               {total?.unit ?? ""}
             </text>
@@ -591,7 +600,7 @@ function UnbalanceBarChart({ data }: any) {
               <XAxis
                 dataKey="phase"
                 tick={{ fill: "#6b7280", fontSize: 13 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
@@ -599,7 +608,7 @@ function UnbalanceBarChart({ data }: any) {
                 domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value)) + 1)]}
                 allowDecimals={false}
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
@@ -652,7 +661,7 @@ function VoltageUnbalanceBarChart({ data }: any) {
               <XAxis
                 dataKey="name"
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
@@ -660,7 +669,7 @@ function VoltageUnbalanceBarChart({ data }: any) {
                 domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value)) + 1)]}
                 allowDecimals={false}
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
