@@ -24,7 +24,7 @@ export default function AuthSuccess() {
       localStorage.removeItem("userEmail")
 
       setTimeout(() => {
-        window.location.href = "/login"
+        window.location.replace("/login")
       }, 1200)
 
       return
@@ -52,7 +52,7 @@ export default function AuthSuccess() {
 
         if (!email) {
           console.log("❌ Session never loaded")
-          window.location.href = "/login"
+          window.location.replace("/login")
           return
         }
 
@@ -83,7 +83,7 @@ export default function AuthSuccess() {
 
         if (!backendRes.ok || !data?.token) {
           console.error("❌ Backend failed")
-          window.location.href = "/login"
+          window.location.replace("/login")
           return
         }
 
@@ -95,14 +95,16 @@ export default function AuthSuccess() {
         console.log("✅ TOKEN SAVED")
 
         // ✅ REDIRECT
-        window.location.href =
-          (data.role || "user") === "admin"
-            ? "/dashboard"
-            : "/user"
+        // ✅ REDIRECT (FIXED)
+window.location.replace(
+  (data.role || "user") === "admin"
+    ? "/dashboard"
+    : "/user"
+)
 
       } catch (err) {
         console.error("❌ Auth error:", err)
-        window.location.href = "/login"
+        window.location.replace("/login")
       }
     }
 

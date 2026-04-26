@@ -27,9 +27,17 @@ export default function DashboardPage() {
     const role = localStorage.getItem("userRole")
 
     if (!token) {
-      window.location.href = "/login"
-      return
-    }
+  fetch("/api/auth/session")
+    .then(res => res.json())
+    .then(session => {
+      if (session?.user?.email) {
+        window.location.href = "/authsuccess"
+      } else {
+        window.location.href = "/login"
+      }
+    })
+  return
+}
 
     if (role !== "admin") {
       window.location.href = "/user"
