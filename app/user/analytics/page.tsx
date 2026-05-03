@@ -22,7 +22,12 @@ import {
 const API = process.env.NEXT_PUBLIC_API_URL
 
 // ✅ COLORS FOR PIE
-const COLORS = ["#2563eb", "#22c55e", "#f59e0b"]
+const PHASE_COLORS: any = {
+  A: "#ef4444", // red
+  B: "#eab308", // yellow
+  C: "#3b82f6", // blue
+  TOTAL: "#6b7280", // grey
+}
 
 export default function AnalyticsPage() {
   const [boards, setBoards] = useState<any[]>([])
@@ -58,18 +63,19 @@ export default function AnalyticsPage() {
     fetchBoards()
   }, [])
 
-const fetchBoards = async () => {
-  const res = await fetch(`${API}/api/boards`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
+  const fetchBoards = async () => {
+    const res = await fetch(`${API}/api/boards`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const json = await res.json()
 
-  const json = await res.json()
+    const myBoards = json.filter(
+      (b: any) => b.email?.toLowerCase() === userEmail
+    )
 
-  // ✅ backend should already return only user's boards
-  setBoards(json)
-
-  json.forEach((b: any) => fetchSlaves(b.id))
-}
+    setBoards(myBoards)
+    myBoards.forEach((b: any) => fetchSlaves(b.id))
+  }
 
   const fetchSlaves = async (boardId: number) => {
     const res = await fetch(`${API}/api/boards/${boardId}/slaves`, {
@@ -139,6 +145,8 @@ const fetchBoards = async () => {
     )
 
     setLoading(false)
+    setOpenBoards(false)
+setOpenSlaves(false)
   }
 
   const latest =
@@ -391,7 +399,7 @@ const buildTHDVoltageData = () => {
               ⚡ {loadType?.toUpperCase()}
             </h2>
             <p className="text-xs text-gray-400 mt-1">
-              Updated: {formatRawTimestamp(data.header?.timestamp)}
+              Updated: {formatRawTimestamp(latest?.timestamp)}
             </p>
           </div>
 
@@ -412,7 +420,7 @@ const buildTHDVoltageData = () => {
           <ChartBlock title="Reactive Energy" data={buildChartData("reactiveEnergyDelivered")} />
 
           {/* PIE CHARTS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             <PieBlock
               title="Active Power : Phase Wise"
@@ -452,10 +460,12 @@ const buildTHDVoltageData = () => {
 function KPI({ title, data }: any) {
   return (
     <div className="bg-white rounded-2xl shadow p-4">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-bold text-blue-600 mt-2">
-        {data?.value ?? 0}
+      <p className="text-xs text-gray-500">{title}</p>
+
+      <p className="text-sm md:text-base font-semibold text-blue-600 mt-1 break-all leading-tight">
+        {data?.value !== undefined ? Number(data.value).toString() : 0}
       </p>
+
       <p className="text-xs text-gray-400">{data?.unit ?? ""}</p>
     </div>
   )
@@ -512,13 +522,14 @@ function PieBlock({ title, data, total }: any) {
               nameKey="name"
               cx="50%"
               cy="50%"
-              innerRadius={60}
-              outerRadius={90}
-              label={({ value }) => `${value}`} // ✅ keep your current behavior
+              innerRadius="55%"
+outerRadius="70%"
+             label={({ value }) => `${value} ${total?.unit || ""}`} // ✅ keep your current behavior
+             labelLine={false}
             >
-              {data.map((_: any, index: number) => (
-                <Cell key={index} fill={COLORS[index % COLORS.length]} />
-              ))}
+             {data.map((entry: any, index: number) => (
+  <Cell key={index} fill={PHASE_COLORS[entry.name] || "#999"} />
+))}
             </Pie>
 
             {/* ✅ CENTER VALUE (unchanged) */}
@@ -527,7 +538,7 @@ function PieBlock({ title, data, total }: any) {
               y="45%"
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-lg font-bold fill-gray-800"
+             className="text-sm md:text-base font-semibold fill-gray-800"
             >
               {total?.value ?? 0}
             </text>
@@ -537,7 +548,7 @@ function PieBlock({ title, data, total }: any) {
               y="60%"
               textAnchor="middle"
               dominantBaseline="middle"
-              className="text-sm fill-gray-400"
+              className="text-xs fill-gray-400"
             >
               {total?.unit ?? ""}
             </text>
@@ -590,7 +601,7 @@ function UnbalanceBarChart({ data }: any) {
               <XAxis
                 dataKey="phase"
                 tick={{ fill: "#6b7280", fontSize: 13 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
@@ -598,30 +609,38 @@ function UnbalanceBarChart({ data }: any) {
                 domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value)) + 1)]}
                 allowDecimals={false}
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111827",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-                formatter={(value: any, _: any, props: any) => {
-                  return [`${value} %`, props.payload.label]
-                }}
-              />
+  contentStyle={{
+    backgroundColor: "#111827",
+    border: "none",
+    borderRadius: "8px",
+  }}
+  itemStyle={{ color: "#fff" }}
+  labelStyle={{ color: "#fff" }}
+  formatter={(value: any, _: any, props: any) => {
+    return [`${value} %`, props.payload.label]
+  }}
+/>
 
               {/* ❌ REMOVE LEGEND (it’s useless here) */}
 
-              <Bar
-                dataKey="value"
-                fill="#2563eb"
-                barSize={35}
-                radius={[10, 10, 0, 0]}
-              />
+              <Bar dataKey="value" barSize={35} radius={[10, 10, 0, 0]}>
+  {data.map((entry: any, index: number) => {
+  let color = "#2563eb"
+
+  const key = entry.phase || entry.name   // 👈 IMPORTANT FIX
+
+  if (key === "A") color = "#ef4444"   // RED
+  if (key === "B") color = "#eab308"   // YELLOW
+  if (key === "C") color = "#3b82f6"   // BLUE
+
+  return <Cell key={index} fill={color} />
+})}
+</Bar>
             </BarChart>
           </ResponsiveContainer>
 
@@ -651,7 +670,7 @@ function VoltageUnbalanceBarChart({ data }: any) {
               <XAxis
                 dataKey="name"
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
@@ -659,28 +678,36 @@ function VoltageUnbalanceBarChart({ data }: any) {
                 domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value)) + 1)]}
                 allowDecimals={false}
                 tick={{ fill: "#6b7280", fontSize: 12 }}
-                axisLine={false}
+                axisLine={{ stroke: "#9ca3af" }}
                 tickLine={false}
               />
 
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111827",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-                formatter={(value: any, _: any, props: any) => {
-                  return [`${value} %`, props.payload.label]
-                }}
-              />
+  contentStyle={{
+    backgroundColor: "#111827",
+    border: "none",
+    borderRadius: "8px",
+  }}
+  itemStyle={{ color: "#fff" }}
+  labelStyle={{ color: "#fff" }}
+  formatter={(value: any, _: any, props: any) => {
+    return [`${value} %`, props.payload.label]
+  }}
+/>
 
-              <Bar
-                dataKey="value"
-                fill="#22c55e"
-                barSize={30}
-                radius={[8, 8, 0, 0]}
-              />
+              <Bar dataKey="value" barSize={30} radius={[8, 8, 0, 0]}>
+  {data.map((entry: any, index: number) => {
+    let color = "#22c55e"
+
+    if (entry.name === "AB") color = "#ef4444"        // RED
+    if (entry.name === "BC") color = "#eab308"        // YELLOW
+    if (entry.name === "CA") color = "#3b82f6"        // BLUE
+   if (entry.name === "LL Worst" || entry.name === "LL") color = "#ec4899"  // PINK
+if (entry.name === "LN Worst" || entry.name === "LN") color = "#92400e"  // BROWN
+
+    return <Cell key={index} fill={color} />
+  })}
+</Bar>
             </BarChart>
           </ResponsiveContainer>
 
@@ -689,3 +716,4 @@ function VoltageUnbalanceBarChart({ data }: any) {
     </div>
   )
 }
+

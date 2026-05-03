@@ -420,7 +420,7 @@ const buildTHDVoltageData = () => {
           <ChartBlock title="Reactive Energy" data={buildChartData("reactiveEnergyDelivered")} />
 
           {/* PIE CHARTS */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
             <PieBlock
               title="Active Power : Phase Wise"
@@ -523,8 +523,9 @@ function PieBlock({ title, data, total }: any) {
               cx="50%"
               cy="50%"
               innerRadius="55%"
-outerRadius="80%"
-              label={({ value }) => `${value}`} // ✅ keep your current behavior
+outerRadius="70%"
+             label={({ value }) => `${value} ${total?.unit || ""}`} // ✅ keep your current behavior
+             labelLine={false}
             >
              {data.map((entry: any, index: number) => (
   <Cell key={index} fill={PHASE_COLORS[entry.name] || "#999"} />
