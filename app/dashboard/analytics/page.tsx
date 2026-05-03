@@ -599,10 +599,11 @@ function UnbalanceBarChart({ data }: any) {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
 
               <XAxis
-                dataKey="phase"
-                tick={{ fill: "#6b7280", fontSize: 13 }}
-                axisLine={{ stroke: "#9ca3af" }}
-                tickLine={false}
+  dataKey="phase"
+  tickFormatter={(value, index) => {
+    const item = data[index]
+    return item?.phase || item?.name || ""
+  }}
               />
 
               <YAxis
