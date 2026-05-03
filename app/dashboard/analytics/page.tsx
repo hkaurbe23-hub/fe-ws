@@ -613,25 +613,33 @@ function UnbalanceBarChart({ data }: any) {
               />
 
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111827",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-                formatter={(value: any, _: any, props: any) => {
-                  return [`${value} %`, props.payload.label]
-                }}
-              />
+  contentStyle={{
+    backgroundColor: "#111827",
+    border: "none",
+    borderRadius: "8px",
+  }}
+  itemStyle={{ color: "#fff" }}
+  labelStyle={{ color: "#fff" }}
+  formatter={(value: any, _: any, props: any) => {
+    return [`${value} %`, props.payload.label]
+  }}
+/>
 
               {/* ❌ REMOVE LEGEND (it’s useless here) */}
 
-              <Bar
-                dataKey="value"
-                fill="#2563eb"
-                barSize={35}
-                radius={[10, 10, 0, 0]}
-              />
+              <Bar dataKey="value" barSize={35} radius={[10, 10, 0, 0]}>
+  {data.map((entry: any, index: number) => {
+  let color = "#2563eb"
+
+  const key = entry.phase || entry.name   // 👈 IMPORTANT FIX
+
+  if (key === "A") color = "#ef4444"   // RED
+  if (key === "B") color = "#eab308"   // YELLOW
+  if (key === "C") color = "#3b82f6"   // BLUE
+
+  return <Cell key={index} fill={color} />
+})}
+</Bar>
             </BarChart>
           </ResponsiveContainer>
 
@@ -674,23 +682,31 @@ function VoltageUnbalanceBarChart({ data }: any) {
               />
 
               <Tooltip
-                contentStyle={{
-                  backgroundColor: "#111827",
-                  border: "none",
-                  borderRadius: "8px",
-                  color: "#fff",
-                }}
-                formatter={(value: any, _: any, props: any) => {
-                  return [`${value} %`, props.payload.label]
-                }}
-              />
+  contentStyle={{
+    backgroundColor: "#111827",
+    border: "none",
+    borderRadius: "8px",
+  }}
+  itemStyle={{ color: "#fff" }}
+  labelStyle={{ color: "#fff" }}
+  formatter={(value: any, _: any, props: any) => {
+    return [`${value} %`, props.payload.label]
+  }}
+/>
 
-              <Bar
-                dataKey="value"
-                fill="#22c55e"
-                barSize={30}
-                radius={[8, 8, 0, 0]}
-              />
+              <Bar dataKey="value" barSize={30} radius={[8, 8, 0, 0]}>
+  {data.map((entry: any, index: number) => {
+    let color = "#22c55e"
+
+    if (entry.name === "AB") color = "#ef4444"        // RED
+    if (entry.name === "BC") color = "#eab308"        // YELLOW
+    if (entry.name === "CA") color = "#3b82f6"        // BLUE
+   if (entry.name === "LL Worst" || entry.name === "LL") color = "#ec4899"  // PINK
+if (entry.name === "LN Worst" || entry.name === "LN") color = "#92400e"  // BROWN
+
+    return <Cell key={index} fill={color} />
+  })}
+</Bar>
             </BarChart>
           </ResponsiveContainer>
 
