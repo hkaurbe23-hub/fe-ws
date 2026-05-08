@@ -19,6 +19,14 @@ export default function ReportsPage() {
   const [loadingNormal, setLoadingNormal] = useState(false)
   const [loadingSingle, setLoadingSingle] = useState(false)
 
+  const [selectedMonth, setSelectedMonth] = useState(
+  new Date().getMonth() + 1
+)
+
+const [selectedYear, setSelectedYear] = useState(
+  new Date().getFullYear()
+)
+
   const token =
     typeof window !== "undefined"
       ? localStorage.getItem("jwtToken")
@@ -123,7 +131,11 @@ setLoadingNormal(true)
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ boards: payload }),
+      body: JSON.stringify({
+  boards: payload,
+  month: selectedMonth,
+  year: selectedYear,
+}),
     })
 
     if (!res.ok) {
@@ -162,7 +174,11 @@ setLoadingSingle(true)
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ boards: payload }),
+      body: JSON.stringify({
+  boards: payload,
+  month: selectedMonth,
+  year: selectedYear,
+}),
     })
 
     if (!res.ok) {
@@ -320,6 +336,45 @@ setLoadingSingle(true)
             </div>
           )}
         </div>
+        
+        {/* MONTH */}
+<select
+  value={selectedMonth}
+  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+  className="px-4 py-2 border rounded-md bg-gray-100"
+>
+  {[
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ].map((m, index) => (
+    <option key={index} value={index + 1}>
+      {m}
+    </option>
+  ))}
+</select>
+
+{/* YEAR */}
+<select
+  value={selectedYear}
+  onChange={(e) => setSelectedYear(Number(e.target.value))}
+  className="px-4 py-2 border rounded-md bg-gray-100"
+>
+  {[2024, 2025, 2026, 2027].map((y) => (
+    <option key={y} value={y}>
+      {y}
+    </option>
+  ))}
+</select>
 
         {/* BUTTONS */}
         <button
