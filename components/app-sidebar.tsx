@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+
 import {
   LayoutDashboard,
   CircuitBoard,
@@ -11,6 +12,7 @@ import {
   Settings,
   Zap,
 } from "lucide-react"
+
 import {
   Sidebar,
   SidebarContent,
@@ -24,27 +26,62 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
+
 import { WattSenseLogo } from "@/components/wattsense-logo"
 
 // ✅ ADMIN NAV
 const adminNav = [
-  { title: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { title: "Boards", icon: CircuitBoard, href: "/dashboard/boards" },
+  {
+    title: "Dashboard",
+    icon: LayoutDashboard,
+    href: "/dashboard",
+  },
+  {
+    title: "Boards",
+    icon: CircuitBoard,
+    href: "/dashboard/boards",
+  },
 ]
 
-// ✅ USER NAV (FIXED ORDER + ICON)
+// ✅ USER NAV
 const userNav = [
-  { title: "My Boards", icon: CircuitBoard, href: "/dashboard/my-boards" },
-  { title: "Energy Dashboard", icon: Zap, href: "/dashboard/energy" },
-  { title: "Analytics", icon: BarChart3, href: "/dashboard/analytics" },
-  { title: "Alarms", icon: Bell, href: "/dashboard/alarms" },
-  { title: "Reports", icon: FileText, href: "/dashboard/reports" },
-  { title: "Settings", icon: Settings, href: "/dashboard/settings" },
+  {
+    title: "My Boards",
+    icon: CircuitBoard,
+    href: "/dashboard/my-boards",
+  },
+  {
+    title: "Energy Dashboard",
+    icon: Zap,
+    href: "/dashboard/energy",
+  },
+  {
+    title: "Analytics",
+    icon: BarChart3,
+    href: "/dashboard/analytics",
+  },
+  {
+    title: "Alarms",
+    icon: Bell,
+    href: "/dashboard/alarms",
+  },
+  {
+    title: "Reports",
+    icon: FileText,
+    href: "/dashboard/reports",
+  },
+  {
+    title: "Settings",
+    icon: Settings,
+    href: "/dashboard/settings",
+  },
 ]
 
 export function AppSidebar() {
   const pathname = usePathname()
+
   const { state } = useSidebar()
+
   const collapsed = state === "collapsed"
 
   const renderMenu = (items: typeof adminNav) =>
@@ -56,45 +93,253 @@ export function AppSidebar() {
 
       return (
         <SidebarMenuItem key={item.title}>
+
           <SidebarMenuButton
             asChild
             isActive={isActive}
             tooltip={item.title}
+            className="
+              h-auto
+              p-0
+              bg-transparent
+              hover:bg-transparent
+              border-none
+              shadow-none
+            "
           >
-            <Link href={item.href}>
-              <item.icon className="size-4" />
-              <span>{item.title}</span>
+
+            <Link
+              href={item.href}
+              className={`
+                relative
+                flex
+                items-center
+                gap-4
+                transition-all
+                duration-300
+
+                ${
+                  collapsed
+  ? `
+      justify-center
+      w-[60px]
+      h-[60px]
+      rounded-2xl
+      mx-auto
+      overflow-visible
+    `
+                    : `
+                      h-[62px]
+                      px-5
+                      rounded-r-full
+                    `
+                }
+
+                ${
+                  isActive
+                    ? `
+                        bg-white
+                        text-[#1e293b]
+                        shadow-none
+                        ${
+                          collapsed
+                            ? ""
+                            : "pr-12 mr-[-25px]"
+                        }
+                        relative
+                        z-20
+                      `
+                    : `
+                        text-white
+                        hover:bg-white/18
+                      `
+                }
+              `}
+            >
+
+              {/* ICON */}
+              <div
+                className={`
+                  flex
+                  items-center
+                  justify-center
+
+                  ${
+                    collapsed
+                      ? "w-[48px] h-[48px]"
+                      : "min-w-[42px] h-[42px]"
+                  }
+
+                  rounded-xl
+                  transition-all
+
+                  ${
+                    isActive
+                      ? "bg-[#14b8a6]/10 text-[#14b8a6]"
+                      : "bg-white/20 text-white"
+                  }
+                `}
+              >
+                <item.icon className="size-5" />
+              </div>
+
+              {/* TEXT */}
+              {!collapsed && (
+                <span
+                  className={`
+                    text-[18px]
+                    font-semibold
+                    tracking-[0.01em]
+                    transition-all
+
+                    ${
+                      isActive
+                        ? "text-[#1e293b]"
+                        : "text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.18)]"
+                    }
+                  `}
+                >
+                  {item.title}
+                </span>
+              )}
+
             </Link>
+
           </SidebarMenuButton>
+
         </SidebarMenuItem>
       )
     })
 
   return (
-    <Sidebar collapsible="icon" className="border-r border-sidebar-border">
-      <SidebarHeader className="px-3 py-4">
-        <WattSenseLogo collapsed={collapsed} />
-      </SidebarHeader>
+    <Sidebar
+  collapsible="icon"
+  className="
+    border-r-0
+    bg-transparent
+    w-[260px]
+    data-[state=collapsed]:w-[75px]
+    transition-all
+    duration-300
+  "
+>
 
-      <SidebarContent>
-        {/* 🔴 ADMIN */}
-        <SidebarGroup>
-          <SidebarGroupLabel>Admin</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderMenu(adminNav)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+      <div
+        className="
+          h-full
+          bg-gradient-to-b
+          from-[#2dd4bf]
+          to-[#14b8a6]
+          px-0.8
+          pt-4
+          relative
+          overflow-visible
+        "
+      >
 
-        {/* 🟢 USER */}
-        <SidebarGroup>
-          <SidebarGroupLabel>User</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>{renderMenu(userNav)}</SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+        {/* BIG WHITE CURVE */}
+        <div
+          className="
+            absolute
+            bottom-[-80px]
+            left-[-60px]
+            w-[180px]
+            h-[180px]
+            rounded-full
+            bg-white/20
+          "
+        />
 
-      <SidebarRail />
+        {/* LOGO */}
+        <SidebarHeader className="mb-8">
+
+  <div
+    className={`
+      bg-white/10
+      border
+      border-white/20
+      backdrop-blur-xl
+      transition-all
+      duration-300
+
+      ${
+        collapsed
+          ? "rounded-2xl p-3 flex justify-center"
+          : "rounded-[30px] px-4 py-4"
+      }
+    `}
+  >
+    <WattSenseLogo collapsed={collapsed} />
+  </div>
+
+</SidebarHeader>
+
+        <SidebarContent className="gap-10">
+
+          {/* ADMIN */}
+          <SidebarGroup>
+
+            {!collapsed && (
+              <SidebarGroupLabel
+                className="
+                  text-white/90
+                  uppercase
+                  tracking-[0.22em]
+                  text-xs
+                  font-bold
+                  px-3
+                  mb-4
+                "
+              >
+                Admin
+              </SidebarGroupLabel>
+            )}
+
+            <SidebarGroupContent>
+
+              <SidebarMenu className="space-y-2">
+                {renderMenu(adminNav)}
+              </SidebarMenu>
+
+            </SidebarGroupContent>
+
+          </SidebarGroup>
+
+          {/* USER */}
+          <SidebarGroup>
+
+            {!collapsed && (
+              <SidebarGroupLabel
+                className="
+                  text-white/90
+                  uppercase
+                  tracking-[0.22em]
+                  text-xs
+                  font-bold
+                  px-3
+                  mb-4
+                "
+              >
+                User
+              </SidebarGroupLabel>
+            )}
+
+            <SidebarGroupContent>
+
+              <SidebarMenu className="space-y-2">
+                {renderMenu(userNav)}
+              </SidebarMenu>
+
+            </SidebarGroupContent>
+
+          </SidebarGroup>
+
+        </SidebarContent>
+
+        <SidebarRail />
+
+      </div>
+
     </Sidebar>
   )
 }

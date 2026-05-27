@@ -412,6 +412,15 @@ const buildTHDVoltageData = () => {
             <KPI title="Frequency" data={latest.frequency} />
             <KPI title="LL Avg Voltage" data={latest.voltageLLAvg} />
             <KPI title="LN Avg Voltage" data={latest.voltageLNAvg} />
+            <KPI
+  title="Day Consumption"
+  data={data?.kpis?.dayConsumption}
+/>
+
+<KPI
+  title="Night Consumption"
+  data={data?.kpis?.nightConsumption}
+/>
           </div>
 
           {/* LINE CHARTS */}
