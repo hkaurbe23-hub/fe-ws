@@ -179,7 +179,7 @@ export default function DashboardPage() {
         <div>
 
           <p className="
-            text-sm
+            text-xl
             font-medium
             text-teal-500
             mb-2
@@ -233,82 +233,120 @@ export default function DashboardPage() {
     </div>
 
     {/* STATS */}
-    <div className="
-      grid
-      gap-6
-      md:grid-cols-2
-      xl:grid-cols-3
-      mb-8
-    ">
+<div
+  className="
+    grid
+    gap-6
+    md:grid-cols-2
+    xl:grid-cols-3
+    mb-8
+  "
+>
 
-      {stats.map((stat, i) => (
-        <Card
-          key={i}
-          className="
-            rounded-[28px]
-            border
-            border-[#d7f5ef]
-            bg-white
-            shadow-sm
-            hover:shadow-xl
-            transition-all
-            duration-300
-            hover:-translate-y-1
+  {stats.map((stat, i) => {
+
+    const gradients = [
+  "from-[#14b8a6] to-[#2dd4bf]",
+  "from-[#0f766e] to-[#14b8a6]",
+  "from-[#99f6e4] to-[#5eead4]",
+]
+
+    return (
+
+      <div
+  key={i}
+  className={`
+    relative
+    overflow-hidden
+    rounded-[38px]
+    p-7
+    min-h-[210px]
+    shadow-[0_12px_30px_rgba(20,184,166,0.12)]
+    hover:shadow-[0_18px_40px_rgba(20,184,166,0.18)]
+    hover:-translate-y-1
+    transition-all
+    duration-300
+    bg-gradient-to-br
+    ${gradients[i]}
+  `}
+>
+
+        {/* folder notch */}
+<div
+  className="
+    absolute
+    top-0
+    left-8
+    w-28
+    h-7
+    bg-white/18
+    rounded-b-[20px]
+    backdrop-blur-xl
+  "
+/>
+
+        {/* soft blob */}
+<div
+  className="
+    absolute
+    -right-6
+    -bottom-6
+    w-32
+    h-32
+    bg-white/10
+    rounded-full
+  "
+/>
+
+        {/* icon */}
+        <div
+  className="
+    w-14
+    h-14
+    rounded-[18px]
+    bg-white/25
+            backdrop-blur-xl
+            flex
+            items-center
+            justify-center
+            text-white
+            mb-10
           "
         >
+          <stat.icon className="w-7 h-7" />
+        </div>
 
-          <CardHeader className="
-            flex
-            flex-row
-            items-center
-            justify-between
-            pb-2
-          ">
+        {/* content */}
+        <div className="relative z-10">
 
-            <div>
+          <p
+            className="
+              text-white/100
+              text-2xl
+              mb-2
+              font-medium
+            "
+          >
+            {stat.title}
+          </p>
 
-              <CardTitle className="
-                text-sm
-                font-medium
-                text-slate-500
-              ">
-                {stat.title}
-              </CardTitle>
+          <h2
+  className="
+    text-4xl
+    font-bold
+    text-white
+    tracking-tight
+  "
+>
+            {stat.value}
+          </h2>
 
-            </div>
+        </div>
 
-            <div className="
-              w-12
-              h-12
-              rounded-2xl
-              bg-[#dffcf7]
-              flex
-              items-center
-              justify-center
-              text-[#14b8a6]
-            ">
-
-              <stat.icon className="w-5 h-5" />
-
-            </div>
-
-          </CardHeader>
-
-          <CardContent>
-
-            <div className="
-              text-4xl
-              font-bold
-              text-slate-800
-            ">
-              {stat.value}
-            </div>
-
-          </CardContent>
-
-        </Card>
-      ))}
-    </div>
+      </div>
+    )
+  })}
+</div>
 
     {/* QUICK ACTIONS */}
     <Card
@@ -325,7 +363,7 @@ export default function DashboardPage() {
 
         <CardTitle className="
           text-xl
-          font-semibold
+          font-bold
           text-slate-800
         ">
           Quick Actions
@@ -349,7 +387,7 @@ export default function DashboardPage() {
               rounded-2xl
               bg-[#14b8a6]
               text-white
-              font-medium
+              font-lg
               hover:bg-teal-600
               transition
             "

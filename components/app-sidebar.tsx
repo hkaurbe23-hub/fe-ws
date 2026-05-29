@@ -175,7 +175,7 @@ export function AppSidebar() {
 
                   ${
                     isActive
-                      ? "bg-[#14b8a6]/10 text-[#14b8a6]"
+                      ? "bg-[#0d9488]/10 text-[#0d9488]"
                       : "bg-white/20 text-white"
                   }
                 `}
@@ -213,31 +213,31 @@ export function AppSidebar() {
 
   return (
     <Sidebar
-  collapsible="icon"
-  className="
-    border-r-0
-    bg-transparent
-    w-[260px]
-    data-[state=collapsed]:w-[75px]
-    transition-all
-    duration-300
-  "
->
+      collapsible="icon"
+      className="
+        border-r-0
+        bg-transparent
+        w-[260px]
+        data-[state=collapsed]:w-[75px]
+        transition-all
+        duration-300
+      "
+    >
 
       <div
         className="
           h-full
-          bg-gradient-to-b
-          from-[#2dd4bf]
-          to-[#14b8a6]
           px-0.8
           pt-4
           relative
           overflow-visible
         "
+        style={{
+          background: "linear-gradient(160deg, #0f766e 0%, #0d9488 50%, #0a7870 100%)",
+        }}
       >
 
-        {/* BIG WHITE CURVE */}
+        {/* DECORATIVE CIRCLE */}
         <div
           className="
             absolute
@@ -246,33 +246,44 @@ export function AppSidebar() {
             w-[180px]
             h-[180px]
             rounded-full
-            bg-white/20
           "
+          style={{ background: "rgba(255,255,255,0.08)" }}
+        />
+
+        {/* SECOND DECORATIVE CIRCLE */}
+        <div
+          className="
+            absolute
+            top-[120px]
+            right-[-40px]
+            w-[120px]
+            h-[120px]
+            rounded-full
+          "
+          style={{ background: "rgba(255,255,255,0.05)" }}
         />
 
         {/* LOGO */}
         <SidebarHeader className="mb-8">
+          <div
+            className={`
+              border
+              border-white/20
+              backdrop-blur-xl
+              transition-all
+              duration-300
 
-  <div
-    className={`
-      bg-white/10
-      border
-      border-white/20
-      backdrop-blur-xl
-      transition-all
-      duration-300
-
-      ${
-        collapsed
-          ? "rounded-2xl p-3 flex justify-center"
-          : "rounded-[30px] px-4 py-4"
-      }
-    `}
-  >
-    <WattSenseLogo collapsed={collapsed} />
-  </div>
-
-</SidebarHeader>
+              ${
+                collapsed
+                  ? "rounded-2xl p-3 flex justify-center"
+                  : "rounded-[30px] px-4 py-4"
+              }
+            `}
+            style={{ background: "rgba(255,255,255,0.12)" }}
+          >
+            <WattSenseLogo collapsed={collapsed} />
+          </div>
+        </SidebarHeader>
 
         <SidebarContent className="gap-10">
 
@@ -296,11 +307,9 @@ export function AppSidebar() {
             )}
 
             <SidebarGroupContent>
-
               <SidebarMenu className="space-y-2">
                 {renderMenu(adminNav)}
               </SidebarMenu>
-
             </SidebarGroupContent>
 
           </SidebarGroup>
@@ -325,11 +334,9 @@ export function AppSidebar() {
             )}
 
             <SidebarGroupContent>
-
               <SidebarMenu className="space-y-2">
                 {renderMenu(userNav)}
               </SidebarMenu>
-
             </SidebarGroupContent>
 
           </SidebarGroup>

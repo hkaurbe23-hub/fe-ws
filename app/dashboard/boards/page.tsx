@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { MoreVertical } from "lucide-react"
+import { Eye, Pencil, Trash2, LogOut, Search } from "lucide-react"
 
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
@@ -21,8 +21,9 @@ export default function BoardsPage() {
 
   const [floors, setFloors] = useState<Floor[]>([])
   const [boardsByFloor, setBoardsByFloor] = useState<Record<number, any[]>>({})
-  const [activeMenu, setActiveMenu] = useState<number | null>(null)
+  const [selectedFloor, setSelectedFloor] = useState<number | null>(null)
   const [newFloor, setNewFloor] = useState("")
+  const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -30,14 +31,11 @@ export default function BoardsPage() {
     fetchFloors()
   }, [])
 
-  // ✅ FETCH FLOORS
   async function fetchFloors() {
     try {
       setLoading(true)
       setError(null)
-
       const token = localStorage.getItem("jwtToken")
-
       if (!token) throw new Error("No token")
 
       const res = await fetch(`${API}/api/floors`, {
@@ -51,12 +49,7 @@ export default function BoardsPage() {
 
       const data = await res.json()
       setFloors(data)
-
-      // 🔥 FETCH BOARDS FOR EACH FLOOR
-      data.forEach((floor: Floor) => {
-        fetchBoardsForFloor(floor.id)
-      })
-
+      data.forEach((floor: Floor) => fetchBoardsForFloor(floor.id))
     } catch (err) {
       console.error(err)
       setError("Failed to load floors")
@@ -65,101 +58,61 @@ export default function BoardsPage() {
     }
   }
 
-  // 🔥 NEW FUNCTION
   async function fetchBoardsForFloor(floorId: number) {
     try {
       const token = localStorage.getItem("jwtToken")
-
       const res = await fetch(`${API}/api/boards/floor/${floorId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
-
       if (!res.ok) throw new Error()
-
       const data = await res.json()
-
-      setBoardsByFloor(prev => ({
-        ...prev,
-        [floorId]: data
-      }))
-
+      setBoardsByFloor(prev => ({ ...prev, [floorId]: data }))
     } catch (err) {
       console.error("Failed to load boards for floor", floorId)
     }
   }
 
-  // ✅ EXPORT
-  async function handlePrint(floorId: number, floorName: string) {
+  async function handleExport(floorId: number, floorName: string) {
     const token = localStorage.getItem("jwtToken")
     const floorBoards = boardsByFloor[floorId] || []
-
     const uniqueEmails = [
       ...new Set(
-        floorBoards
-          .map((b) => b.email)
-          .filter((email): email is string => !!email)
+        floorBoards.map((b) => b.email).filter((email): email is string => !!email)
       ),
     ]
 
-    if (uniqueEmails.length === 0) {
-      alert("No data available")
-      return
-    }
+    if (uniqueEmails.length === 0) { alert("No data available"); return }
 
     try {
       let allData: any[] = []
-
       for (const email of uniqueEmails) {
-        const res = await fetch(
-          `${API}/api/boards/export/user-data/${email}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        )
-
+        const res = await fetch(`${API}/api/boards/export/user-data/${email}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
         if (!res.ok) continue
-
         const data = await res.json()
         allData = [...allData, ...data]
       }
-
-      if (!allData.length) {
-        alert("No data available")
-        return
-      }
+      if (!allData.length) { alert("No data available"); return }
 
       const ws = XLSX.utils.json_to_sheet(allData)
       const wb = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(wb, ws, floorName)
-
-      const buffer = XLSX.write(wb, {
-        bookType: "xlsx",
-        type: "array",
-      })
-
+      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
       const blob = new Blob([buffer], {
         type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       })
-
       saveAs(blob, `${floorName}_Boards.xlsx`)
-
     } catch (err) {
       console.error(err)
       alert("Export failed")
     }
   }
 
-  // ✅ ADD FLOOR
   async function addFloor() {
     if (!newFloor.trim()) return
-
     try {
       const token = localStorage.getItem("jwtToken")
-
       const res = await fetch(`${API}/api/floors`, {
         method: "POST",
         headers: {
@@ -168,151 +121,253 @@ export default function BoardsPage() {
         },
         body: JSON.stringify({ name: newFloor }),
       })
-
       if (!res.ok) throw new Error()
-
       setNewFloor("")
       fetchFloors()
-
     } catch {
       alert("Failed to add floor")
     }
   }
 
-  // ✅ DELETE FLOOR
   async function deleteFloor(id: number) {
     const token = localStorage.getItem("jwtToken")
-
     try {
       const res = await fetch(`${API}/api/floors/${id}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       })
-
       if (!res.ok) throw new Error()
-
       setFloors((prev) => prev.filter((f) => f.id !== id))
-
     } catch {
       alert("Delete failed")
     }
   }
 
+  const filteredFloors = floors.filter(f =>
+    f.name.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Boards</h1>
+    <div className="min-h-screen p-8" style={{ background: "#f0fafa" }}>
+      <style>{`
+        .floors-list {
+          perspective: 1000px;
+        }
+        .floor-row {
+          background: linear-gradient(135deg, #0d9488 0%, #14b8a6 100%);
+          border-radius: 14px;
+          border: 1px solid #0d9488;
+          padding: 22px 24px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          cursor: pointer;
+          transition: transform 0.22s ease, box-shadow 0.22s ease, background 0.22s ease, border-color 0.22s ease;
+          box-shadow: 0 4px 0px #0a7870, 0 6px 16px rgba(13,148,136,0.25);
+          min-height: 72px;
+          transform-style: preserve-3d;
+          position: relative;
+        }
+        .floor-row .floor-name {
+          color: white;
+          transition: color 0.22s;
+        }
+        .floor-row .floor-count {
+          color: rgba(255,255,255,0.8);
+          transition: color 0.22s;
+        }
+        .floor-row:hover {
+          background: white;
+          border: 2px solid #0d9488;
+          box-shadow: 0 8px 0px #0a7870, 0 14px 32px rgba(13,148,136,0.28);
+          transform: translateY(-4px) rotateX(2deg);
+        }
+        .floor-row:hover .floor-name {
+          color: #0d9488;
+        }
+        .floor-row:hover .floor-count {
+          color: #5eada8;
+        }
+        .floor-row:hover .action-btn {
+          background: rgba(13,148,136,0.1);
+          color: #0d9488;
+        }
+        .floor-row:hover .action-btn:hover {
+          background: rgba(13,148,136,0.22);
+        }
+        .floor-row:hover .action-btn.delete:hover {
+          background: rgba(239,68,68,0.12);
+          color: #ef4444;
+        }
+        .floor-row:active {
+          transform: translateY(0px) rotateX(0deg);
+          box-shadow: 0 2px 0px #0a7870, 0 4px 10px rgba(13,148,136,0.2);
+        }
+        .floor-actions {
+          display: flex;
+          gap: 8px;
+        }
+        .action-btn {
+          background: rgba(255,255,255,0.18);
+          border: none;
+          border-radius: 8px;
+          padding: 8px;
+          color: white;
+          cursor: pointer;
+          transition: background 0.15s, color 0.15s;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .action-btn:hover {
+          background: rgba(255,255,255,0.32);
+        }
+        .action-btn.delete:hover {
+          background: rgba(239,68,68,0.55);
+        }
+        .search-input {
+          flex: 1;
+          border: 1px solid #b2dfdb;
+          border-radius: 10px;
+          padding: 10px 16px 10px 42px;
+          font-size: 14px;
+          outline: none;
+          background: white;
+          color: #1a3a38;
+          transition: border-color 0.2s;
+        }
+        .search-input:focus {
+          border-color: #0d9488;
+          box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+        }
+        .add-btn {
+          background: linear-gradient(135deg, #0d9488, #14b8a6);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 20px;
+          font-size: 14px;
+          font-weight: 600;
+          cursor: pointer;
+          white-space: nowrap;
+          box-shadow: 0 2px 8px rgba(13,148,136,0.3);
+          transition: all 0.18s;
+        }
+        .add-btn:hover {
+          background: linear-gradient(135deg, #0f766e, #0d9488);
+          box-shadow: 0 4px 16px rgba(13,148,136,0.4);
+          transform: translateY(-1px);
+        }
+        .new-floor-input {
+          border: 1px solid #b2dfdb;
+          border-radius: 10px;
+          padding: 10px 16px;
+          font-size: 14px;
+          outline: none;
+          background: white;
+          flex: 1;
+          color: #1a3a38;
+          transition: border-color 0.2s;
+        }
+        .new-floor-input:focus {
+          border-color: #0d9488;
+          box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+        }
+      `}</style>
+
+      <h1 style={{ fontSize: 28, fontWeight: 700, color: "#0d9488", marginBottom: 24 }}>
+        Boards
+      </h1>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+        <div style={{
+          background: "#fef2f2", border: "1px solid #fca5a5",
+          color: "#dc2626", padding: "12px 16px", borderRadius: 10, marginBottom: 20
+        }}>
           {error}
         </div>
       )}
 
-      {/* ADD FLOOR */}
-      <div className="flex gap-3">
-        <input
-          value={newFloor}
-          onChange={(e) => setNewFloor(e.target.value)}
-          placeholder="Enter new floor name"
-          className="border rounded-md px-4 py-2 w-full"
-        />
-        <button
-          onClick={addFloor}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md"
-        >
+      {/* SEARCH + ADD FLOOR */}
+      <div style={{ display: "flex", gap: 12, marginBottom: 24 }}>
+        <div style={{ position: "relative", flex: 1 }}>
+          <Search
+            size={16}
+            style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }}
+          />
+          <input
+            className="search-input"
+            style={{ width: "100%", boxSizing: "border-box" }}
+            placeholder="Search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <button className="add-btn" onClick={() => {
+          const name = prompt("Enter new floor name")
+          if (name) { setNewFloor(name); setTimeout(addFloor, 0) }
+        }}>
           + Add Floor
         </button>
       </div>
 
-      {/* CONTENT */}
+      {/* FLOOR LIST */}
       {loading ? (
-        <div className="text-center py-12 text-gray-500">
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
           Loading floors...
         </div>
-      ) : floors.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">
-          No floors yet
+      ) : filteredFloors.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+          {search ? "No floors match your search" : "No floors yet"}
         </div>
       ) : (
-        <div className="space-y-4">
-          {floors.map((floor) => {
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }} className="floors-list">
+          {filteredFloors.map((floor) => {
             const floorBoards = boardsByFloor[floor.id] || []
 
             return (
               <div
                 key={floor.id}
-                className="bg-white rounded-xl shadow border p-4 relative"
+                className="floor-row"
               >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h2 className="font-semibold text-lg">
-                      {floor.name}
-                    </h2>
-                    <p className="text-sm text-gray-500">
-                      {floorBoards.length} boards
-                    </p>
+                <div>
+                  <div className="floor-name" style={{ fontWeight: 600, fontSize: 20, transition: "color 0.2s" }}>
+                    {floor.name}
                   </div>
-
-                  <div className="relative">
-                    <button
-                      onClick={() =>
-                        setActiveMenu(
-                          activeMenu === floor.id ? null : floor.id
-                        )
-                      }
-                      className="p-2 hover:bg-gray-100 rounded-full"
-                    >
-                      <MoreVertical size={18} />
-                    </button>
-
-                    {activeMenu === floor.id && (
-                      <div className="absolute right-0 mt-2 w-40 bg-white border rounded-md shadow-md z-10">
-                        
-                        <button
-                          onClick={() => {
-                            router.push(`/dashboard/boards/${floor.id}`)
-                            setActiveMenu(null)
-                          }}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                        >
-                          View
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            router.push(`/dashboard/boards/edit/${floor.id}`)
-                            setActiveMenu(null)
-                          }}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                        >
-                          Edit
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            deleteFloor(floor.id)
-                            setActiveMenu(null)
-                          }}
-                          className="block w-full text-left px-4 py-2 text-red-600 hover:bg-gray-100"
-                        >
-                          Delete
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            handlePrint(floor.id, floor.name)
-                            setActiveMenu(null)
-                          }}
-                          className="block w-full text-left px-4 py-2 hover:bg-gray-100"
-                        >
-                          Export
-                        </button>
-
-                      </div>
-                    )}
+                  <div className="floor-count" style={{ fontSize: 18, marginTop: 3, transition: "color 0.2s" }}>
+                    {floorBoards.length} boards
                   </div>
+                </div>
+
+                <div className="floor-actions">
+                  <button
+                    className="action-btn"
+                    title="View"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/boards/${floor.id}`) }}
+                  >
+                    <Eye size={17} />
+                  </button>
+                  <button
+                    className="action-btn"
+                    title="Edit"
+                    onClick={(e) => { e.stopPropagation(); router.push(`/dashboard/boards/edit/${floor.id}`) }}
+                  >
+                    <Pencil size={17} />
+                  </button>
+                  <button
+                    className="action-btn delete"
+                    title="Delete"
+                    onClick={(e) => { e.stopPropagation(); deleteFloor(floor.id) }}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                  <button
+                    className="action-btn"
+                    title="Export"
+                    onClick={(e) => { e.stopPropagation(); handleExport(floor.id, floor.name) }}
+                  >
+                    <LogOut size={17} />
+                  </button>
                 </div>
               </div>
             )
