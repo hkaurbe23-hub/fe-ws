@@ -24,24 +24,20 @@ export default function ReportsPage() {
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwtToken") : null
-  const userEmail =
-    typeof window !== "undefined"
-      ? localStorage.getItem("userEmail")?.toLowerCase()
-      : null
 
   useEffect(() => {
     fetchBoards()
   }, [])
 
+  // ── ADMIN: fetch ALL boards (no email filter) ──
   const fetchBoards = async () => {
     const res = await fetch(`${API}/api/boards`, {
       headers: { Authorization: `Bearer ${token}` },
     })
     const json = await res.json()
-    const myBoards = json.filter((b: any) => b.email?.toLowerCase() === userEmail)
-    setBoards(myBoards)
+    setBoards(json)
     setSelectedBoards([])
-    myBoards.forEach((b: any) => fetchSlaves(b.id))
+    json.forEach((b: any) => fetchSlaves(b.id))
   }
 
   const fetchSlaves = async (boardId: number) => {
@@ -148,7 +144,7 @@ export default function ReportsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#f0fdfb",          // very light cyan-tinted page bg
+        background: "#f0fdfb",
         fontFamily: "'DM Sans', sans-serif",
         padding: "2rem",
       }}
@@ -156,7 +152,6 @@ export default function ReportsPage() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
 
-        /* ── card ── */
         .ws-card {
           background: #ffffff;
           border-radius: 16px;
@@ -164,20 +159,19 @@ export default function ReportsPage() {
           overflow: visible;
         }
 
-        /* ── dropdown trigger button ── */
         .ws-dropdown-btn {
           display: flex;
           align-items: center;
           gap: 8px;
           padding: 10px 16px;
           background: #fff;
-          border: 1.5px solid #99e6da;    /* light cyan border */
+          border: 1.5px solid #99e6da;
           border-radius: 10px;
           cursor: pointer;
           font-family: 'DM Sans', sans-serif;
           font-size: 20px;
           font-weight: 500;
-          color: "#000706";                 /* dark teal text */
+          color: "#000706";
           transition: all 0.18s;
           white-space: nowrap;
         }
@@ -190,7 +184,6 @@ export default function ReportsPage() {
           border-color: #00bfa5;
         }
 
-        /* ── dropdown panel ── */
         .ws-dropdown-menu {
           position: absolute;
           top: calc(100% + 8px);
@@ -211,13 +204,12 @@ export default function ReportsPage() {
           border-radius: 4px;
         }
 
-        /* ── checkbox rows ── */
         .ws-checkbox-label {
           display: flex;
           align-items: center;
           gap: 8px;
           font-size: 20px;
-          color: "#000706";                 /* dark teal label text */
+          color: "#000706";
           padding: 5px 4px;
           border-radius: 6px;
           cursor: pointer;
@@ -225,42 +217,36 @@ export default function ReportsPage() {
         }
         .ws-checkbox-label:hover { background: #e0faf6; }
         .ws-checkbox-label input[type="checkbox"] {
-          accent-color: #00bfa5;          /* cyan-teal checkbox tick */
+          accent-color: #00bfa5;
           width: 15px;
           height: 15px;
           cursor: pointer;
         }
 
-        /* ── selects ── */
         .ws-select {
-  padding: 10px 16px;
-  background: #ffffff; /* white dropdown bg */
-  border: 1.5px solid #99e6da;
-  border-radius: 10px;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 16px;
-  font-weight: 600;
-  color: #111111; /* black text */
-  cursor: pointer;
-  outline: none;
-  appearance: none;
-
-  /* BIGGER DROPDOWN ARROW */
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2300bfa5' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-
-  background-repeat: no-repeat;
-  background-position: right 14px center;
-  background-size: 18px;
-
-  padding-right: 42px;
-  transition: all 0.18s;
-}
+          padding: 10px 16px;
+          background: #ffffff;
+          border: 1.5px solid #99e6da;
+          border-radius: 10px;
+          font-family: 'DM Sans', sans-serif;
+          font-size: 16px;
+          font-weight: 600;
+          color: #111111;
+          cursor: pointer;
+          outline: none;
+          appearance: none;
+          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2300bfa5' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+          background-repeat: no-repeat;
+          background-position: right 14px center;
+          background-size: 18px;
+          padding-right: 42px;
+          transition: all 0.18s;
+        }
         .ws-select:hover, .ws-select:focus {
           border-color: #00bfa5;
           background-color: #ffffff;
         }
 
-        /* ── primary button (filled teal, matches sidebar/card gradient) ── */
         .ws-btn-primary {
           display: flex;
           align-items: center;
@@ -290,7 +276,6 @@ export default function ReportsPage() {
           transform: none;
         }
 
-        /* ── secondary button (outlined teal) ── */
         .ws-btn-secondary {
           display: flex;
           align-items: center;
@@ -318,7 +303,6 @@ export default function ReportsPage() {
           transform: none;
         }
 
-        /* ── count badge ── */
         .ws-badge {
           display: inline-flex;
           align-items: center;
@@ -333,7 +317,6 @@ export default function ReportsPage() {
           padding: 0 6px;
         }
 
-        /* ── stat cards ── */
         .ws-stat-card {
           border-radius: 14px;
           padding: 1.25rem 1.5rem;
@@ -353,7 +336,6 @@ export default function ReportsPage() {
           flex-shrink: 0;
         }
 
-        /* ── misc ── */
         .separator {
           height: 1.5px;
           background: linear-gradient(90deg, #99e6da, transparent);
@@ -370,7 +352,6 @@ export default function ReportsPage() {
           border-top: 1.5px solid #e0faf6;
         }
 
-        /* ── loading dots ── */
         .loading-dot {
           display: inline-block;
           animation: blink 1.2s step-start infinite;
@@ -403,7 +384,7 @@ export default function ReportsPage() {
             style={{
               fontSize: "1.75rem",
               fontWeight: 600,
-              color: "#007a6a",           /* dark teal heading */
+              color: "#007a6a",
               margin: 0,
             }}
           >
@@ -411,7 +392,7 @@ export default function ReportsPage() {
           </h1>
         </div>
         <p style={{ color: "#4db6ac", fontSize: 14, margin: 0, paddingLeft: 52 }}>
-          Export and analyse energy data across your boards
+          Export and analyse energy data across all boards
         </p>
       </div>
 
@@ -424,7 +405,6 @@ export default function ReportsPage() {
           marginBottom: "1.75rem",
         }}
       >
-        {/* card 1 – deepest teal (matches sidebar/nav) */}
         <div
           className="ws-stat-card"
           style={{ background: "linear-gradient(135deg, #00897b, #00695c)" }}
@@ -438,7 +418,6 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* card 2 – mid cyan-teal (matches dashboard stat cards) */}
         <div
           className="ws-stat-card"
           style={{ background: "linear-gradient(135deg, #00bfa5, #00897b)" }}
@@ -452,7 +431,6 @@ export default function ReportsPage() {
           </div>
         </div>
 
-        {/* card 3 – bright cyan (lightest, matches "Inactive Boards" card) */}
         <div
           className="ws-stat-card"
           style={{ background: "linear-gradient(135deg, #4dd0c4, #00bfa5)" }}
@@ -475,7 +453,7 @@ export default function ReportsPage() {
             fontWeight: 600,
             textTransform: "uppercase",
             letterSpacing: "0.07em",
-            color: "#000706",             /* cyan-teal section label */
+            color: "#000706",
             marginBottom: 16,
           }}
         >
@@ -703,7 +681,7 @@ export default function ReportsPage() {
           <p
             style={{
               fontSize: 16,
-              color: "#000706",            /* muted cyan hint text */
+              color: "#000706",
               margin: "auto 0 auto auto",
               alignSelf: "center",
             }}

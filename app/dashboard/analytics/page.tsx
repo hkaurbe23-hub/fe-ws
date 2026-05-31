@@ -26,6 +26,18 @@ const PHASE_COLORS: any = {
   C: "#3b82f6",
 }
 
+// ─── Helper: format numbers compactly ────────────────────────────────────────
+function fmtVal(v: number | string | undefined): string {
+  if (v === undefined || v === null) return "—"
+  const n = Number(v)
+  if (isNaN(n)) return String(v)
+  if (Math.abs(n) >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M"
+  if (Math.abs(n) >= 1_000) return (n / 1_000).toFixed(2) + "k"
+  if (Math.abs(n) >= 100) return n.toFixed(2)
+  if (Math.abs(n) >= 10) return n.toFixed(3)
+  return n.toFixed(4)
+}
+
 export default function AdminAnalyticsPage() {
   const [boards, setBoards] = useState<any[]>([])
   const [boardSlaves, setBoardSlaves] = useState<any>({})
@@ -81,6 +93,9 @@ export default function AdminAnalyticsPage() {
     setLoading(true)
     const res = await fetch(`${API}/api/boards/${boardId}/analytics/${slaveId}`, { headers: { Authorization: `Bearer ${token}` } })
     const json = await res.json()
+    console.log("API response keys:", Object.keys(json))
+    console.log("data.latest:", json.latest)
+    console.log("last record:", json.records?.[json.records.length - 1])
     setData(json)
     localStorage.setItem("admin_analytics_state", JSON.stringify({ selectedBoards, selectedSlaves, data: json }))
     setLoading(false)
@@ -88,7 +103,7 @@ export default function AdminAnalyticsPage() {
     setOpenSlaves(false)
   }
 
-  const latest = data?.records?.length > 0 ? data.records[data.records.length - 1] : {}
+  const latest = data?.latest ?? (data?.records?.length > 0 ? data.records[data.records.length - 1] : {})
 
   const getLoadType = () => {
     if (selectedBoards.length === 0) return null
@@ -164,6 +179,28 @@ export default function AdminAnalyticsPage() {
     { name:"LN", value: latest.thdVoltageLN?.value||0, label:"THD Voltage LN" },
   ]
 
+  const buildVoltageHarmonicsData = () => {
+    if (!latest) return []
+    const harmonics = ["h1", "h3", "h5", "h7", "h9", "h11", "h13", "h15"]
+    return harmonics.map((h) => ({
+      harmonic: h.toUpperCase(),
+      AB: Number(latest[`voltageab_${h}`]?.value ?? 0),
+      BC: Number(latest[`voltagebc_${h}`]?.value ?? 0),
+      CA: Number(latest[`voltageca_${h}`]?.value ?? 0),
+    }))
+  }
+
+  const buildCurrentHarmonicsData = () => {
+    if (!latest) return []
+    const harmonics = ["h1", "h3", "h5", "h7", "h9", "h11", "h13", "h15"]
+    return harmonics.map((h) => ({
+      harmonic: h.toUpperCase(),
+      A: Number(latest[`currentA_${h}`]?.value ?? 0),
+      B: Number(latest[`currentB_${h}`]?.value ?? 0),
+      C: Number(latest[`currentC_${h}`]?.value ?? 0),
+    }))
+  }
+
   const selectedBoardLabel = selectedBoards.length === 1
     ? boards.find(b => b.id === selectedBoards[0])?.board_uid || "1 Board"
     : selectedBoards.length > 1 ? `${selectedBoards.length} Boards` : "Select Board"
@@ -183,11 +220,9 @@ export default function AdminAnalyticsPage() {
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         * { box-sizing: border-box; }
 
-        /* ── Scrollbar ── */
         ::-webkit-scrollbar { width: 4px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
 
-        /* ── Dropdown ── */
         .an-dd-btn {
           display: flex; align-items: center; gap: 8px;
           padding: 10px 16px;
@@ -227,7 +262,6 @@ export default function AdminAnalyticsPage() {
         .an-check-row:hover { background: #f0fdf8; color: #1a7a5e; }
         .an-check-row input[type="checkbox"] { accent-color: #1a7a5e; width: 14px; height: 14px; cursor: pointer; }
 
-        /* ── Apply button ── */
         .an-apply-btn {
           display: flex; align-items: center; gap: 7px;
           padding: 10px 22px;
@@ -242,21 +276,20 @@ export default function AdminAnalyticsPage() {
         }
         .an-apply-btn:hover { background: #155f49; }
 
-        /* ── KPI cards ── */
         .an-kpi-card {
           background: #fff;
           border-radius: 14px;
-          padding: 1.1rem 1.2rem;
+          padding: 0.9rem 1rem;
           border: 1.5px solid #e2e8f0;
           transition: box-shadow 0.18s, border-color 0.18s;
           position: relative; overflow: hidden;
+          min-width: 0;
         }
         .an-kpi-card:hover {
           box-shadow: 0 6px 20px rgba(0,0,0,0.08);
           border-color: #cbd5e1;
         }
 
-        /* ── Chart cards ── */
         .an-chart-card {
           background: #fff;
           border-radius: 14px;
@@ -266,7 +299,6 @@ export default function AdminAnalyticsPage() {
         }
         .an-chart-card:hover { box-shadow: 0 4px 18px rgba(0,0,0,0.07); }
 
-        /* ── Section label ── */
         .an-section-label {
           font-size: 11px; font-weight: 700;
           text-transform: uppercase; letter-spacing: 0.09em;
@@ -277,14 +309,12 @@ export default function AdminAnalyticsPage() {
           content: ''; flex: 1; height: 1px; background: #e2e8f0;
         }
 
-        /* ── Chart title ── */
         .an-chart-title {
           font-size: 15px; font-weight: 600;
           color: #0f172a; margin: 0 0 1.1rem;
           display: flex; align-items: center; gap: 8px;
         }
 
-        /* ── Filter card ── */
         .an-filter-card {
           background: #fff;
           border-radius: 14px;
@@ -293,7 +323,6 @@ export default function AdminAnalyticsPage() {
           margin-bottom: 1.75rem;
         }
 
-        /* ── Live dot ── */
         @keyframes livePulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0.5); }
           50% { box-shadow: 0 0 0 5px rgba(34,197,94,0); }
@@ -305,7 +334,6 @@ export default function AdminAnalyticsPage() {
           flex-shrink: 0;
         }
 
-        /* ── Spinner ── */
         @keyframes spin { to { transform: rotate(360deg) } }
         .an-spinner {
           width: 44px; height: 44px;
@@ -316,10 +344,41 @@ export default function AdminAnalyticsPage() {
           margin: 0 auto;
         }
 
-        /* ── Divider ── */
         .an-vdiv {
           width: 1px; height: 26px;
           background: #e2e8f0; flex-shrink: 0;
+        }
+
+        /* KPI value: clamp so it never wraps or overflows */
+        .an-kpi-value {
+          font-size: clamp(12px, 1.6vw, 17px);
+          font-weight: 700;
+          color: #0f172a;
+          margin: 0 0 1px;
+          line-height: 1.15;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .an-kpi-unit {
+          font-size: 11px;
+          font-weight: 500;
+          color: #94a3b8;
+          margin: 0 0 8px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .an-kpi-label {
+          font-size: 10px;
+          font-weight: 700;
+          color: #94a3b8;
+          margin: 0 0 6px;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
       `}</style>
 
@@ -353,7 +412,6 @@ export default function AdminAnalyticsPage() {
       <div className="an-filter-card">
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "center" }}>
 
-          {/* Board dropdown */}
           <div style={{ position: "relative" }}>
             <button
               className={`an-dd-btn ${openBoards ? "active" : ""}`}
@@ -377,7 +435,6 @@ export default function AdminAnalyticsPage() {
 
           <div className="an-vdiv" />
 
-          {/* Slave dropdown */}
           <div style={{ position: "relative" }}>
             <button
               className={`an-dd-btn ${openSlaves ? "active" : ""}`}
@@ -454,16 +511,16 @@ export default function AdminAnalyticsPage() {
           {/* ── KPI CARDS ── */}
           <div>
             <p className="an-section-label">Key Metrics</p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(155px, 1fr))", gap: 12 }}>
-              <KPI title="Active Load"       icon={<Zap size={14}/>}        accent="#1a7a5e" data={latest.activeEnergyDeliveredIntoLoad} />
-              <KPI title="Apparent Energy"   icon={<Activity size={14}/>}   accent="#d97706" data={latest.apparentEnergyDelivered} />
-              <KPI title="Reactive Energy"   icon={<TrendingUp size={14}/>} accent="#7c3aed" data={latest.reactiveEnergyDelivered} />
-              <KPI title="Power Factor"      icon={<BarChart3 size={14}/>}  accent="#0369a1" data={latest.powerFactorTotal} />
-              <KPI title="Frequency"         icon={<Activity size={14}/>}   accent="#1a7a5e" data={latest.frequency} />
-              <KPI title="LL Avg Voltage"    icon={<Zap size={14}/>}        accent="#d97706" data={latest.voltageLLAvg} />
-              <KPI title="LN Avg Voltage"    icon={<Zap size={14}/>}        accent="#7c3aed" data={latest.voltageLNAvg} />
-              <KPI title="Day Consumption"   icon={<Sun size={14}/>}        accent="#0369a1" data={data?.kpis?.dayConsumption} />
-              <KPI title="Night Consumption" icon={<Moon size={14}/>}       accent="#7c3aed" data={data?.kpis?.nightConsumption} />
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))", gap: 10 }}>
+              <KPI title="Active Load"       icon={<Zap size={13}/>}        accent="#1a7a5e" data={latest.activeEnergyDeliveredIntoLoad} />
+              <KPI title="Apparent Energy"   icon={<Activity size={13}/>}   accent="#d97706" data={latest.apparentEnergyDelivered} />
+              <KPI title="Reactive Energy"   icon={<TrendingUp size={13}/>} accent="#7c3aed" data={latest.reactiveEnergyDelivered} />
+              <KPI title="Power Factor"      icon={<BarChart3 size={13}/>}  accent="#0369a1" data={latest.powerFactorTotal} />
+              <KPI title="Frequency"         icon={<Activity size={13}/>}   accent="#1a7a5e" data={latest.frequency} />
+              <KPI title="LL Avg Voltage"    icon={<Zap size={13}/>}        accent="#d97706" data={latest.voltageLLAvg} />
+              <KPI title="LN Avg Voltage"    icon={<Zap size={13}/>}        accent="#7c3aed" data={latest.voltageLNAvg} />
+              <KPI title="Day Consumption"   icon={<Sun size={13}/>}        accent="#0369a1" data={data?.kpis?.dayConsumption} />
+              <KPI title="Night Consumption" icon={<Moon size={13}/>}       accent="#7c3aed" data={data?.kpis?.nightConsumption} />
             </div>
           </div>
 
@@ -481,10 +538,10 @@ export default function AdminAnalyticsPage() {
           <div>
             <p className="an-section-label">Phase Distribution</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-              <PieBlock title="Active Power"   accentColor="#ef4444" data={buildPieData("active")}   total={latest.activePowerTotal} />
-              <PieBlock title="Apparent Power" accentColor="#f59e0b" data={buildPieData("apparent")} total={latest.apparentPowerTotal} />
-              <PieBlock title="Reactive Power" accentColor="#8b5cf6" data={buildPieData("reactive")} total={latest.reactivePowerTotal} />
-              <PieBlock title="Current"        accentColor="#0ea5e9" data={buildCurrentPie()}         total={latest.currentAvg} />
+              <PieBlock title="Active Power"   accentColor="#ef4444" data={buildPieData("active")}   total={latest.activePowerTotal}   unit={latest.activePowerA?.unit || "kW"} />
+              <PieBlock title="Apparent Power" accentColor="#f59e0b" data={buildPieData("apparent")} total={latest.apparentPowerTotal} unit={latest.apparentPowerA?.unit || "kVA"} />
+              <PieBlock title="Reactive Power" accentColor="#8b5cf6" data={buildPieData("reactive")} total={latest.reactivePowerTotal} unit={latest.reactivePowerA?.unit || "kVAR"} />
+              <PieBlock title="Current"        accentColor="#0ea5e9" data={buildCurrentPie()}         total={latest.currentAvg}         unit={latest.currentA?.unit || "A"} />
             </div>
           </div>
 
@@ -492,10 +549,22 @@ export default function AdminAnalyticsPage() {
           <div>
             <p className="an-section-label">Power Quality</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 14 }}>
-              <PhaseBarChart     title="Current Unbalance" accentColor="#ef4444" data={buildUnbalanceData()} />
-              <MultiBarChart     title="Voltage Unbalance" accentColor="#f59e0b" data={buildVoltageUnbalanceData()} />
-              <PhaseBarChart     title="THD Current"       accentColor="#8b5cf6" data={buildTHDCurrentData()} />
-              <MultiBarChart     title="THD Voltage"       accentColor="#0ea5e9" data={buildTHDVoltageData()} />
+              <PhaseBarChart title="Current Unbalance" accentColor="#ef4444" data={buildUnbalanceData()} />
+              <MultiBarChart title="Voltage Unbalance" accentColor="#f59e0b" data={buildVoltageUnbalanceData()} />
+              <PhaseBarChart title="THD Current"       accentColor="#8b5cf6" data={buildTHDCurrentData()} />
+              <MultiBarChart title="THD Voltage"       accentColor="#0ea5e9" data={buildTHDVoltageData()} />
+              <HarmonicsGroupedChart
+                title="Voltage Harmonics (Odd Orders)"
+                accentColor="#1a7a5e"
+                data={buildVoltageHarmonicsData()}
+                voltage={true}
+              />
+              <HarmonicsGroupedChart
+                title="Current Harmonics (Odd Orders)"
+                accentColor="#7c3aed"
+                data={buildCurrentHarmonicsData()}
+                voltage={false}
+              />
             </div>
           </div>
 
@@ -508,16 +577,17 @@ export default function AdminAnalyticsPage() {
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 
 function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
+  const rawVal = data?.value
+  const displayVal = rawVal !== undefined ? fmtVal(rawVal) : "—"
+
   return (
     <div className="an-kpi-card">
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", margin: 0, textTransform: "uppercase", letterSpacing: "0.06em" }}>{title}</p>
-        <span style={{ color: accent, background: accent + "18", borderRadius: 6, padding: "3px 5px", display: "flex" }}>{icon}</span>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+        <p className="an-kpi-label">{title}</p>
+        <span style={{ color: accent, background: accent + "18", borderRadius: 6, padding: "2px 4px", display: "flex", flexShrink: 0 }}>{icon}</span>
       </div>
-      <p style={{ fontSize: 26, fontWeight: 700, color: "#0f172a", margin: "0 0 2px", lineHeight: 1.1 }}>
-        {data?.value !== undefined ? Number(data.value).toLocaleString() : "—"}
-      </p>
-      <p style={{ fontSize: 12, fontWeight: 500, color: "#94a3b8", margin: "0 0 10px" }}>{data?.unit ?? ""}</p>
+      <p className="an-kpi-value">{displayVal}</p>
+      <p className="an-kpi-unit">{data?.unit ?? ""}</p>
       <div style={{ height: 3, borderRadius: 2, background: "#f1f5f9" }}>
         <div style={{ height: "100%", borderRadius: 2, background: accent, width: "60%" }} />
       </div>
@@ -525,7 +595,7 @@ function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Line Chart Block ────────────────────────────────────────────────────────
+// ─── Line Chart Block ─────────────────────────────────────────────────────────
 
 function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   return (
@@ -558,9 +628,34 @@ function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Pie Chart Block ─────────────────────────────────────────────────────────
+// ─── Custom Pie Label ─────────────────────────────────────────────────────────
+// Renders compact labels outside the pie, never overlapping the donut hole.
 
-function PieBlock({ title, data, total, accentColor = "#1a7a5e" }: any) {
+const RADIAN = Math.PI / 180
+
+function PieLabel({ cx, cy, midAngle, outerRadius, value, unit }: any) {
+  const r = outerRadius + 18
+  const x = cx + r * Math.cos(-midAngle * RADIAN)
+  const y = cy + r * Math.sin(-midAngle * RADIAN)
+  const compact = `${fmtVal(value)} ${unit}`
+  return (
+    <text
+      x={x} y={y}
+      textAnchor={x > cx ? "start" : "end"}
+      dominantBaseline="central"
+      style={{ fontSize: 10, fontWeight: 600, fill: "#475569" }}
+    >
+      {compact}
+    </text>
+  )
+}
+
+// ─── Pie Chart Block ──────────────────────────────────────────────────────────
+
+function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: any) {
+  const totalDisplay = fmtVal(total?.value)
+  const totalUnit = unit || total?.unit || ""
+
   return (
     <div className="an-chart-card">
       <h3 className="an-chart-title">
@@ -569,38 +664,43 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e" }: any) {
       </h3>
       <div style={{ height: 210, position: "relative" }}>
         <ResponsiveContainer>
-          <PieChart>
+          <PieChart margin={{ top: 16, right: 24, bottom: 16, left: 24 }}>
             <Tooltip
               contentStyle={{ background: "#0f172a", border: "none", borderRadius: 10, fontSize: 13 }}
               itemStyle={{ color: "#94a3b8" }}
-              formatter={(v: any, n: any) => [`${v} ${total?.unit || ""}`, `Phase ${n}`]}
+              formatter={(v: any, n: any) => [`${fmtVal(v)} ${totalUnit}`, `Phase ${n}`]}
             />
             <Pie
-              data={data} dataKey="value" nameKey="name"
-              cx="50%" cy="50%"
-              innerRadius="52%" outerRadius="70%"
-              label={({ value }) => `${value} ${total?.unit || ""}`}
+              data={data}
+              dataKey="value"
+              nameKey="name"
+              cx="50%"
+              cy="50%"
+              innerRadius="48%"
+              outerRadius="66%"
               labelLine={false}
+              label={(props: any) => <PieLabel {...props} unit={totalUnit} />}
             >
               {data.map((e: any, i: number) => (
                 <Cell key={i} fill={PHASE_COLORS[e.name] || "#94a3b8"} />
               ))}
             </Pie>
+            {/* Centre text rendered via SVG overlay */}
             <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle"
-              style={{ fontSize: 22, fontWeight: 700, fill: "#0f172a" }}>
-              {total?.value ?? 0}
+              style={{ fontSize: 14, fontWeight: 700, fill: "#0f172a" }}>
+              {totalDisplay}
             </text>
             <text x="50%" y="60%" textAnchor="middle" dominantBaseline="middle"
-              style={{ fontSize: 12, fill: "#94a3b8" }}>
-              {total?.unit ?? ""}
+              style={{ fontSize: 9, fill: "#94a3b8" }}>
+              {totalUnit}
             </text>
           </PieChart>
         </ResponsiveContainer>
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 6 }}>
         {data.map((e: any) => (
-          <span key={e.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, fontWeight: 600, color: "#475569" }}>
-            <span style={{ width: 9, height: 9, borderRadius: "50%", background: PHASE_COLORS[e.name] || "#94a3b8", display: "inline-block" }} />
+          <span key={e.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9, fontWeight: 600, color: "#475569" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: PHASE_COLORS[e.name] || "#94a3b8", display: "inline-block" }} />
             Phase {e.name}
           </span>
         ))}
@@ -609,7 +709,7 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Phase Bar Chart (A / B / C) ─────────────────────────────────────────────
+// ─── Phase Bar Chart (A / B / C) ──────────────────────────────────────────────
 
 function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
   const phaseColors: any = { A: "#ef4444", B: "#f59e0b", C: "#3b82f6" }
@@ -630,10 +730,10 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
               axisLine={false} tickLine={false}
             />
             <YAxis
-              domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value), 1) + 1)]}
-              allowDecimals={false}
               tick={{ fill: "#94a3b8", fontSize: 12 }}
               axisLine={false} tickLine={false}
+              tickFormatter={(v) => `${v}%`}
+              domain={[0, (dataMax: number) => Math.max(dataMax * 1.3, 0.5)]}
             />
             <Tooltip
               contentStyle={{ background: "#0f172a", border: "none", borderRadius: 10, fontSize: 13 }}
@@ -641,7 +741,7 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
               labelStyle={{ color: "#64748b" }}
               formatter={(v: any, _: any, p: any) => [`${v} %`, p.payload.label]}
             />
-            <Bar dataKey="value" barSize={44} radius={[8, 8, 0, 0]}>
+            <Bar dataKey="value" barSize={44} radius={[8, 8, 0, 0]} minPointSize={4}>
               {data.map((e: any, i: number) => {
                 const k = e.phase || e.name
                 return <Cell key={i} fill={phaseColors[k] || "#94a3b8"} />
@@ -675,8 +775,7 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
             <YAxis
-              domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value), 1) + 1)]}
-              allowDecimals={false}
+              domain={[0, (dataMax: number) => Math.max(Math.ceil(dataMax * 1.3), 1)]}
               tick={{ fill: "#94a3b8", fontSize: 12 }}
               axisLine={false} tickLine={false}
             />
@@ -686,13 +785,74 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
               labelStyle={{ color: "#64748b" }}
               formatter={(v: any, _: any, p: any) => [`${v} %`, p.payload.label]}
             />
-            <Bar dataKey="value" barSize={34} radius={[7, 7, 0, 0]}>
+            <Bar dataKey="value" barSize={34} radius={[7, 7, 0, 0]} minPointSize={4}>
               {data.map((e: any, i: number) => (
                 <Cell key={i} fill={colorMap[e.name] || "#94a3b8"} />
               ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+// ─── Harmonics Grouped Chart ──────────────────────────────────────────────────
+
+function HarmonicsGroupedChart({ title, data, voltage = true, accentColor = "#1a7a5e" }: any) {
+  const harmonicBars = data.filter((d: any) => d.harmonic !== "H1")
+  const h1 = data.find((d: any) => d.harmonic === "H1")
+
+  const voltageKeys: [string, string][] = [["AB", "#ef4444"], ["BC", "#f59e0b"], ["CA", "#3b82f6"]]
+  const currentKeys: [string, string][] = [["A", "#ef4444"], ["B", "#f59e0b"], ["C", "#3b82f6"]]
+  const keys = voltage ? voltageKeys : currentKeys
+
+  return (
+    <div className="an-chart-card">
+      <h3 className="an-chart-title">
+        <span style={{ width: 4, height: 18, borderRadius: 2, background: accentColor, flexShrink: 0, display: "block" }} />
+        {title}
+      </h3>
+
+      <div style={{ height: 240 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={harmonicBars} margin={{ top: 10, right: 15, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+            <XAxis
+              dataKey="harmonic"
+              tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }}
+              axisLine={false} tickLine={false}
+            />
+            <YAxis
+              tick={{ fill: "#94a3b8", fontSize: 12 }}
+              axisLine={false} tickLine={false}
+              tickFormatter={(v) => `${v}%`}
+              domain={[0, (dataMax: number) => parseFloat((Math.max(dataMax, 0.5) * 1.4).toFixed(2))]}
+            />
+            <Tooltip
+              contentStyle={{ background: "#0f172a", border: "none", borderRadius: 10, fontSize: 13 }}
+              formatter={(v: any, name: string) => [`${v}%`, name]}
+            />
+            {keys.map(([key, fill]) => (
+              <Bar key={key} dataKey={key} fill={fill} radius={[4, 4, 0, 0]} minPointSize={4} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* ── H1 Fundamental badges ── */}
+      <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, marginTop: 4 }}>
+        <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 8px" }}>
+          H1 Fundamental
+        </p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          {keys.map(([key, color]) => (
+            <span key={key} style={{ fontSize: 12, fontWeight: 600, color: "#475569", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 6, padding: "3px 10px" }}>
+              <span style={{ color }}>{key}</span>{" "}
+              {h1?.[key] !== undefined ? `${fmtVal(h1[key])}${voltage ? "V" : "%"}` : "—"}
+            </span>
+          ))}
+        </div>
       </div>
     </div>
   )

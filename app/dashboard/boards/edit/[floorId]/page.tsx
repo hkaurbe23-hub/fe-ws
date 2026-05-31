@@ -23,7 +23,6 @@ export default function EditFloorPage() {
   const floorId = Number(params?.floorId)
 
   const { boards: contextBoards } = useFloorsContext()
-
   const [boards, setBoards] = useState<Board[]>([])
   const boardsRef = useRef<Board[]>([])
   const [addCount, setAddCount] = useState(1)
@@ -104,24 +103,70 @@ export default function EditFloorPage() {
   }
 
   const deleteBoard = async (id: number | string) => {
-    const token = localStorage.getItem("jwtToken")
-    if (!token) { alert("Please login again"); return }
+  const token = localStorage.getItem("jwtToken")
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://api.wattsense.in"
-    const res = await fetch(`${apiUrl}/api/boards/${id}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${token}` },
-    })
-
-    const data = await res.json()
-    if (!res.ok) { alert(data.error || "Delete failed"); return }
-
-    const newBoards = boards.filter((b) => b.id !== id)
-    setBoards(newBoards)
-    // Adjust page if current page becomes empty
-    const newTotal = Math.max(1, Math.ceil(newBoards.length / BOARDS_PER_PAGE))
-    if (currentPage > newTotal) setCurrentPage(newTotal)
+  if (!token) {
+    alert("Login again")
+    return
   }
+
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://api.wattsense.in"
+
+  try {
+
+    const sendOtp = await fetch(
+      `${apiUrl}/api/boards/${id}/request-delete-otp`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    if (!sendOtp.ok) {
+      alert("Failed to send OTP")
+      return
+    }
+
+    const otp = prompt(
+      "OTP sent to admin email.\n\nEnter OTP:"
+    )
+
+    if (!otp) return
+
+    const verify = await fetch(
+      `${apiUrl}/api/boards/${id}/verify-delete-otp`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ otp }),
+      }
+    )
+
+    const data = await verify.json()
+
+    if (!verify.ok) {
+      alert(data.error || "Invalid OTP")
+      return
+    }
+
+    setBoards(prev =>
+      prev.filter(b => b.id !== id)
+    )
+
+    alert("Board deleted successfully")
+
+  } catch (err) {
+    console.error(err)
+    alert("Delete failed")
+  }
+}
 
   async function saveChanges() {
     try {
