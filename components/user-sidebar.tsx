@@ -25,7 +25,8 @@ import {
 import { WattSenseLogo } from "@/components/wattsense-logo"
 
 const navItems = [
-  { title: "My Boards", icon: CircuitBoard, href: "/user" },
+  { title: "Dashboard", icon: CircuitBoard, href: "/user" },
+  { title: "My Boards", icon: CircuitBoard, href: "/user/my-boards" },
   { title: "Analytics", icon: BarChart3, href: "/user/analytics" },
   { title: "Alarms", icon: Bell, href: "/user/alarms" },
   { title: "Reports", icon: FileText, href: "/user/reports" },
@@ -38,10 +39,11 @@ export function UserSidebar() {
   const collapsed = state === "collapsed"
 
   const renderMenu = (items: typeof navItems) =>
-    items.map((item) => {
-      const isActive =
-        pathname === item.href ||
-        (item.href !== "/user" && pathname.startsWith(item.href))
+  items.map((item) => {
+    const isActive =
+      item.href === "/user"
+        ? pathname === "/user"
+        : pathname.startsWith(item.href)
 
       return (
         <SidebarMenuItem key={item.title}>
