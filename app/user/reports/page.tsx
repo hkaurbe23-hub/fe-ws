@@ -21,6 +21,9 @@ export default function ReportsPage() {
   const [loadingSingle, setLoadingSingle] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [availablePeriods, setAvailablePeriods] = useState<any[]>([])
+  const [openMonth, setOpenMonth] = useState(false)
+  const [openYear, setOpenYear] = useState(false)
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwtToken") : null
@@ -33,6 +36,7 @@ export default function ReportsPage() {
     fetchBoards()
   }, [])
 
+  // Filter to only this user's boards (email match)
   const fetchBoards = async () => {
     const res = await fetch(`${API}/api/boards`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -51,6 +55,40 @@ export default function ReportsPage() {
     const json = await res.json()
     setBoardSlaves((prev: any) => ({ ...prev, [boardId]: json }))
     setSelectedSlaves((prev: any) => ({ ...prev, [boardId]: [] }))
+  }
+
+  useEffect(() => {
+    fetchAvailablePeriods()
+  }, [selectedBoards, selectedSlaves])
+
+  const fetchAvailablePeriods = async () => {
+    try {
+      if (selectedBoards.length === 0) {
+        setAvailablePeriods([])
+        return
+      }
+
+      const slaveIds = Object.values(selectedSlaves)
+        .flat()
+        .join(",")
+
+      const res = await fetch(
+        `${API}/api/reports/available-periods?board_ids=${selectedBoards.join(",")}&slave_ids=${slaveIds}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      )
+
+      const json = await res.json()
+      setAvailablePeriods(json)
+
+      if (json.length > 0) {
+        setSelectedYear(json[0].year)
+        setSelectedMonth(json[0].month)
+      }
+    } catch (err) {
+      console.error(err)
+    }
   }
 
   const toggleBoard = (id: number) => {
@@ -80,6 +118,10 @@ export default function ReportsPage() {
   const handleDownload = async () => {
     if (selectedBoards.length === 0) {
       alert("Select at least one board")
+      return
+    }
+    if (availablePeriods.length === 0) {
+      alert("No data available for selected boards/slaves")
       return
     }
     const payload = selectedBoards.map((bid) => ({
@@ -113,7 +155,18 @@ export default function ReportsPage() {
   }
 
   const handleSingleSheetDownload = async () => {
-    const payload = boards.map((b) => ({ board_id: b.id, slave_ids: [] }))
+    if (selectedBoards.length === 0) {
+      alert("Select at least one board")
+      return
+    }
+    if (availablePeriods.length === 0) {
+      alert("No data available for selected boards/slaves")
+      return
+    }
+    const payload = selectedBoards.map((bid) => ({
+      board_id: bid,
+      slave_ids: selectedSlaves[bid] || [],
+    }))
     setOpenBoards(false)
     setOpenSlaves(false)
     setLoadingSingle(true)
@@ -143,6 +196,11 @@ export default function ReportsPage() {
   const selectedSlaveCount = Object.values(selectedSlaves as Record<string, number[]>)
     .flat()
     .length
+
+  const availableYears = [...new Set(availablePeriods.map((p) => p.year))]
+  const availableMonths = availablePeriods
+    .filter((p) => p.year === selectedYear)
+    .map((p) => p.month)
 
   return (
     <div
@@ -179,14 +237,8 @@ export default function ReportsPage() {
           transition: all 0.18s;
           white-space: nowrap;
         }
-        .ws-dropdown-btn:hover {
-          background: #e0faf6;
-          border-color: #00bfa5;
-        }
-        .ws-dropdown-btn.active {
-          background: #e0faf6;
-          border-color: #00bfa5;
-        }
+        .ws-dropdown-btn:hover { background: #e0faf6; border-color: #00bfa5; }
+        .ws-dropdown-btn.active { background: #e0faf6; border-color: #00bfa5; }
 
         .ws-dropdown-menu {
           position: absolute;
@@ -203,10 +255,7 @@ export default function ReportsPage() {
           box-shadow: 0 8px 24px rgba(0,191,165,0.14);
         }
         .ws-dropdown-menu::-webkit-scrollbar { width: 4px; }
-        .ws-dropdown-menu::-webkit-scrollbar-thumb {
-          background: #66d9c8;
-          border-radius: 4px;
-        }
+        .ws-dropdown-menu::-webkit-scrollbar-thumb { background: #66d9c8; border-radius: 4px; }
 
         .ws-checkbox-label {
           display: flex;
@@ -225,30 +274,6 @@ export default function ReportsPage() {
           width: 15px;
           height: 15px;
           cursor: pointer;
-        }
-
-        .ws-select {
-          padding: 10px 16px;
-          background: #ffffff;
-          border: 1.5px solid #99e6da;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 16px;
-          font-weight: 600;
-          color: #111111;
-          cursor: pointer;
-          outline: none;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2300bfa5' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 14px center;
-          background-size: 18px;
-          padding-right: 42px;
-          transition: all 0.18s;
-        }
-        .ws-select:hover, .ws-select:focus {
-          border-color: #00bfa5;
-          background-color: #ffffff;
         }
 
         .ws-btn-primary {
@@ -274,11 +299,7 @@ export default function ReportsPage() {
           transform: translateY(-1px);
         }
         .ws-btn-primary:active { transform: translateY(0); }
-        .ws-btn-primary:disabled {
-          opacity: 0.65;
-          cursor: not-allowed;
-          transform: none;
-        }
+        .ws-btn-primary:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
 
         .ws-btn-secondary {
           display: flex;
@@ -301,11 +322,7 @@ export default function ReportsPage() {
           box-shadow: 0 4px 12px rgba(0,191,165,0.14);
           transform: translateY(-1px);
         }
-        .ws-btn-secondary:disabled {
-          opacity: 0.65;
-          cursor: not-allowed;
-          transform: none;
-        }
+        .ws-btn-secondary:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
 
         .ws-badge {
           display: inline-flex;
@@ -384,14 +401,7 @@ export default function ReportsPage() {
           >
             <BarChart2 size={20} color="#fff" />
           </div>
-          <h1
-            style={{
-              fontSize: "1.75rem",
-              fontWeight: 600,
-              color: "#007a6a",
-              margin: 0,
-            }}
-          >
+          <h1 style={{ fontSize: "1.75rem", fontWeight: 600, color: "#007a6a", margin: 0 }}>
             Reports Dashboard
           </h1>
         </div>
@@ -409,39 +419,22 @@ export default function ReportsPage() {
           marginBottom: "1.75rem",
         }}
       >
-        <div
-          className="ws-stat-card"
-          style={{ background: "linear-gradient(135deg, #00897b, #00695c)" }}
-        >
-          <div className="ws-icon-circle">
-            <Zap size={20} color="#fff" />
-          </div>
+        <div className="ws-stat-card" style={{ background: "linear-gradient(135deg, #00897b, #00695c)" }}>
+          <div className="ws-icon-circle"><Zap size={20} color="#fff" /></div>
           <div>
             <p style={{ fontSize: 20, margin: 0, opacity: 0.85 }}>Total Boards</p>
             <p style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>{boards.length}</p>
           </div>
         </div>
-
-        <div
-          className="ws-stat-card"
-          style={{ background: "linear-gradient(135deg, #00bfa5, #00897b)" }}
-        >
-          <div className="ws-icon-circle">
-            <BarChart2 size={20} color="#fff" />
-          </div>
+        <div className="ws-stat-card" style={{ background: "linear-gradient(135deg, #00bfa5, #00897b)" }}>
+          <div className="ws-icon-circle"><BarChart2 size={20} color="#fff" /></div>
           <div>
             <p style={{ fontSize: 20, margin: 0, opacity: 0.85 }}>Selected Boards</p>
             <p style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>{selectedBoards.length}</p>
           </div>
         </div>
-
-        <div
-          className="ws-stat-card"
-          style={{ background: "linear-gradient(135deg, #4dd0c4, #00bfa5)" }}
-        >
-          <div className="ws-icon-circle">
-            <FileSpreadsheet size={20} color="#fff" />
-          </div>
+        <div className="ws-stat-card" style={{ background: "linear-gradient(135deg, #4dd0c4, #00bfa5)" }}>
+          <div className="ws-icon-circle"><FileSpreadsheet size={20} color="#fff" /></div>
           <div>
             <p style={{ fontSize: 20, margin: 0, opacity: 0.85 }}>Selected Slaves</p>
             <p style={{ fontSize: 24, fontWeight: 600, margin: 0 }}>{selectedSlaveCount}</p>
@@ -486,13 +479,9 @@ export default function ReportsPage() {
               )}
               <ChevronDown
                 size={16}
-                style={{
-                  transition: "transform 0.2s",
-                  transform: openBoards ? "rotate(180deg)" : "rotate(0)",
-                }}
+                style={{ transition: "transform 0.2s", transform: openBoards ? "rotate(180deg)" : "rotate(0)" }}
               />
             </button>
-
             {openBoards && (
               <div className="ws-dropdown-menu">
                 <label className="ws-checkbox-label" style={{ fontWeight: 600, marginBottom: 6 }}>
@@ -545,13 +534,9 @@ export default function ReportsPage() {
               )}
               <ChevronDown
                 size={16}
-                style={{
-                  transition: "transform 0.2s",
-                  transform: openSlaves ? "rotate(180deg)" : "rotate(0)",
-                }}
+                style={{ transition: "transform 0.2s", transform: openSlaves ? "rotate(180deg)" : "rotate(0)" }}
               />
             </button>
-
             {openSlaves && (
               <div className="ws-dropdown-menu" style={{ minWidth: 240 }}>
                 {selectedBoards.map((bid) => {
@@ -603,37 +588,61 @@ export default function ReportsPage() {
           </div>
 
           {/* DIVIDER */}
-          <div
-            style={{
-              width: 1.5,
-              height: 36,
-              background: "#99e6da",
-              borderRadius: 2,
-              flexShrink: 0,
-            }}
-          />
+          <div style={{ width: 1.5, height: 36, background: "#99e6da", borderRadius: 2, flexShrink: 0 }} />
 
-          {/* MONTH */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="ws-select"
-          >
-            {MONTHS.map((m, i) => (
-              <option key={i} value={i + 1}>{m}</option>
-            ))}
-          </select>
+          {/* MONTH DROPDOWN */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="ws-dropdown-btn"
+              onClick={() => { setOpenMonth(!openMonth); setOpenYear(false); setOpenBoards(false); setOpenSlaves(false) }}
+            >
+              {MONTHS[selectedMonth - 1]}
+              <ChevronDown
+                size={16}
+                style={{ transition: "transform 0.2s", transform: openMonth ? "rotate(180deg)" : "rotate(0)" }}
+              />
+            </button>
+            {openMonth && (
+              <div className="ws-dropdown-menu">
+                {availableMonths.map((m) => (
+                  <label
+                    key={m}
+                    className="ws-checkbox-label"
+                    onClick={() => { setSelectedMonth(m); setOpenMonth(false) }}
+                  >
+                    {MONTHS[m - 1]}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
 
-          {/* YEAR */}
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="ws-select"
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          {/* YEAR DROPDOWN */}
+          <div style={{ position: "relative" }}>
+            <button
+              className="ws-dropdown-btn"
+              onClick={() => { setOpenYear(!openYear); setOpenMonth(false); setOpenBoards(false); setOpenSlaves(false) }}
+            >
+              {selectedYear}
+              <ChevronDown
+                size={16}
+                style={{ transition: "transform 0.2s", transform: openYear ? "rotate(180deg)" : "rotate(0)" }}
+              />
+            </button>
+            {openYear && (
+              <div className="ws-dropdown-menu" style={{ minWidth: 120 }}>
+                {availableYears.map((y) => (
+                  <label
+                    key={y}
+                    className="ws-checkbox-label"
+                    onClick={() => { setSelectedYear(Number(y)); setOpenYear(false) }}
+                  >
+                    {y}
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Row 2: Export buttons */}
@@ -646,50 +655,21 @@ export default function ReportsPage() {
             borderTop: "1.5px solid #e0faf6",
           }}
         >
-          <button
-            className="ws-btn-primary"
-            onClick={handleDownload}
-            disabled={loadingNormal}
-          >
+          <button className="ws-btn-primary" onClick={handleDownload} disabled={loadingNormal}>
             <Download size={16} />
             {loadingNormal ? (
-              <>
-                Downloading
-                <span className="loading-dot">.</span>
-                <span className="loading-dot">.</span>
-                <span className="loading-dot">.</span>
-              </>
-            ) : (
-              "Download Report"
-            )}
+              <>Downloading<span className="loading-dot">.</span><span className="loading-dot">.</span><span className="loading-dot">.</span></>
+            ) : "Download Report"}
           </button>
 
-          <button
-            className="ws-btn-secondary"
-            onClick={handleSingleSheetDownload}
-            disabled={loadingSingle}
-          >
+          <button className="ws-btn-secondary" onClick={handleSingleSheetDownload} disabled={loadingSingle}>
             <FileSpreadsheet size={16} />
             {loadingSingle ? (
-              <>
-                Downloading
-                <span className="loading-dot">.</span>
-                <span className="loading-dot">.</span>
-                <span className="loading-dot">.</span>
-              </>
-            ) : (
-              "Download Single Sheet"
-            )}
+              <>Downloading<span className="loading-dot">.</span><span className="loading-dot">.</span><span className="loading-dot">.</span></>
+            ) : "Download Single Sheet"}
           </button>
 
-          <p
-            style={{
-              fontSize: 16,
-              color: "#000706",
-              margin: "auto 0 auto auto",
-              alignSelf: "center",
-            }}
-          >
+          <p style={{ fontSize: 16, color: "#000706", margin: "auto 0 auto auto", alignSelf: "center" }}>
             {MONTHS[selectedMonth - 1]} {selectedYear}
             {selectedBoards.length > 0 && ` · ${selectedBoards.length} board${selectedBoards.length > 1 ? "s" : ""}`}
           </p>
@@ -698,3 +678,4 @@ export default function ReportsPage() {
     </div>
   )
 }
+

@@ -35,7 +35,7 @@ const navItems = [
 
 export function UserSidebar() {
   const pathname = usePathname()
-  const { state } = useSidebar()
+  const { state, setOpenMobile } = useSidebar()
   const collapsed = state === "collapsed"
 
   const renderMenu = (items: typeof navItems) =>
@@ -61,7 +61,10 @@ export function UserSidebar() {
             "
           >
             <Link
-              href={item.href}
+             href={item.href}
+  onClick={() => {
+    setOpenMobile(false)
+  }}
               className={`
                 relative
                 flex

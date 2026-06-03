@@ -80,7 +80,7 @@ const userNav = [
 export function AppSidebar() {
   const pathname = usePathname()
 
-  const { state } = useSidebar()
+  const { state, setOpenMobile } = useSidebar()
 
   const collapsed = state === "collapsed"
 
@@ -110,6 +110,9 @@ export function AppSidebar() {
 
             <Link
               href={item.href}
+             onClick={() => {
+            setOpenMobile(false)
+      }}
               className={`
                 relative
                 flex

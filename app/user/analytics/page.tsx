@@ -26,7 +26,6 @@ const PHASE_COLORS: any = {
   C: "#3b82f6",
 }
 
-// ─── Helper: format numbers compactly ────────────────────────────────────────
 function fmtVal(v: number | string | undefined): string {
   if (v === undefined || v === null) return "—"
   const n = Number(v)
@@ -36,6 +35,32 @@ function fmtVal(v: number | string | undefined): string {
   if (Math.abs(n) >= 100) return n.toFixed(2)
   if (Math.abs(n) >= 10) return n.toFixed(3)
   return n.toFixed(4)
+}
+
+// ─── Returns the latest non-zero value for a given key across records ─────────
+function getLatestNonZero(records: any[], key: string): any {
+  if (!records?.length) return undefined
+  for (let i = records.length - 1; i >= 0; i--) {
+    const val = records[i]?.[key]?.value
+    if (val !== undefined && val !== null && Number(val) !== 0) {
+      return records[i][key]
+    }
+  }
+  // All zero — return the actual last value (column is all zero)
+  return records[records.length - 1]?.[key]
+}
+
+// ─── Build a "healthy latest" snapshot from records ───────────────────────────
+function buildHealthyLatest(records: any[]): any {
+  if (!records?.length) return {}
+  const allKeys = Object.keys(records[records.length - 1] || {})
+  const result: any = {}
+  for (const key of allKeys) {
+    result[key] = getLatestNonZero(records, key)
+  }
+  // Always use the actual last timestamp
+  result.timestamp = records[records.length - 1]?.timestamp
+  return result
 }
 
 export default function UserAnalyticsPage() {
@@ -75,6 +100,7 @@ export default function UserAnalyticsPage() {
       headers: { Authorization: `Bearer ${token}` },
     })
     const json = await res.json()
+    // Only show boards claimed by this user
     const myBoards = json.filter(
       (b: any) => b.email?.toLowerCase() === userEmail
     )
@@ -102,11 +128,7 @@ export default function UserAnalyticsPage() {
 
   const toggleSlave = (boardId: number, slaveId: number) => {
     const current = selectedSlaves[boardId] || []
-    if (current.includes(slaveId)) {
-      setSelectedSlaves({ ...selectedSlaves, [boardId]: [] })
-    } else {
-      setSelectedSlaves({ ...selectedSlaves, [boardId]: [slaveId] })
-    }
+    setSelectedSlaves({ ...selectedSlaves, [boardId]: current.includes(slaveId) ? [] : [slaveId] })
   }
 
   const fetchAnalytics = async () => {
@@ -132,16 +154,17 @@ export default function UserAnalyticsPage() {
     setOpenSlaves(false)
   }
 
-  const latest =
-    data?.latest ?? (data?.records?.length > 0 ? data.records[data.records.length - 1] : {})
+  // ─── Use healthy latest instead of raw latest ──────────────────────────────
+  const latest = data?.records?.length > 0
+    ? buildHealthyLatest(data.records)
+    : (data?.latest ?? {})
 
   const getLoadType = () => {
     if (selectedBoards.length === 0) return null
     const boardId = selectedBoards[0]
     const slaveId = selectedSlaves[boardId]?.[0]
     if (!slaveId) return null
-    const slaves = boardSlaves[boardId] || []
-    const slave = slaves.find((s: any) => s.slave_id === slaveId)
+    const slave = (boardSlaves[boardId] || []).find((s: any) => s.slave_id === slaveId)
     return slave?.load_type || null
   }
 
@@ -152,93 +175,73 @@ export default function UserAnalyticsPage() {
     return ts.replace("T", " ").replace("Z", "").split(".")[0]
   }
 
+  // ─── Chart: skip zeros, carry forward last healthy value ───────────────────
   const buildChartData = (key: string) => {
     if (!data?.records) return []
     let lastHealthyValue: number | null = null
-    return data.records
-      .map((r: any, index: number) => {
-        const currentValue = Number(r[key]?.value ?? 0)
-        if (lastHealthyValue === null && currentValue > 0) {
-          lastHealthyValue = currentValue
-        } else if (currentValue === 0) {
-        } else if (lastHealthyValue !== null && currentValue < lastHealthyValue) {
-        } else if (currentValue > 0) {
-          lastHealthyValue = currentValue
-        }
-        if (lastHealthyValue === null) return null
-        return { index, value: lastHealthyValue, fullTime: r.timestamp }
-      })
-      .filter(Boolean)
+    const allZero = data.records.every((r: any) => Number(r[key]?.value ?? 0) === 0)
+
+    return data.records.map((r: any, index: number) => {
+      const currentValue = Number(r[key]?.value ?? 0)
+
+      if (allZero) {
+        return { index, value: 0, fullTime: r.timestamp }
+      }
+
+      if (currentValue !== 0) {
+        lastHealthyValue = currentValue
+      }
+
+      if (lastHealthyValue === null) return null
+
+      return { index, value: lastHealthyValue, fullTime: r.timestamp }
+    }).filter(Boolean)
   }
 
+  // ─── Pie: use healthy latest values ───────────────────────────────────────
   const buildPieData = (type: string) => {
     if (!latest) return []
-    if (type === "active") return [
-      { name: "A", value: latest.activePowerA?.value || 0 },
-      { name: "B", value: latest.activePowerB?.value || 0 },
-      { name: "C", value: latest.activePowerC?.value || 0 },
-    ]
-    if (type === "apparent") return [
-      { name: "A", value: latest.apparentPowerA?.value || 0 },
-      { name: "B", value: latest.apparentPowerB?.value || 0 },
-      { name: "C", value: latest.apparentPowerC?.value || 0 },
-    ]
-    if (type === "reactive") return [
-      { name: "A", value: latest.reactivePowerA?.value || 0 },
-      { name: "B", value: latest.reactivePowerB?.value || 0 },
-      { name: "C", value: latest.reactivePowerC?.value || 0 },
-    ]
-    return []
+    const map: any = {
+      active:   [{ name: "A", value: latest.activePowerA?.value || 0 }, { name: "B", value: latest.activePowerB?.value || 0 }, { name: "C", value: latest.activePowerC?.value || 0 }],
+      apparent: [{ name: "A", value: latest.apparentPowerA?.value || 0 }, { name: "B", value: latest.apparentPowerB?.value || 0 }, { name: "C", value: latest.apparentPowerC?.value || 0 }],
+      reactive: [{ name: "A", value: latest.reactivePowerA?.value || 0 }, { name: "B", value: latest.reactivePowerB?.value || 0 }, { name: "C", value: latest.reactivePowerC?.value || 0 }],
+    }
+    return map[type] || []
   }
 
-  const buildCurrentPie = () => {
-    if (!latest) return []
-    return [
-      { name: "A", value: latest.currentA?.value || 0 },
-      { name: "B", value: latest.currentB?.value || 0 },
-      { name: "C", value: latest.currentC?.value || 0 },
-    ]
-  }
+  const buildCurrentPie = () => !latest ? [] : [
+    { name: "A", value: latest.currentA?.value || 0 },
+    { name: "B", value: latest.currentB?.value || 0 },
+    { name: "C", value: latest.currentC?.value || 0 },
+  ]
 
-  const buildUnbalanceData = () => {
-    if (!latest) return []
-    return [
-      { phase: "A", value: latest.currentUnbalanceA?.value || 0, label: "currentUnbalance : Phase A" },
-      { phase: "B", value: latest.currentUnbalanceB?.value || 0, label: "currentUnbalance : Phase B" },
-      { phase: "C", value: latest.currentUnbalanceC?.value || 0, label: "currentUnbalance : Phase C" },
-    ]
-  }
+  const buildUnbalanceData = () => !latest ? [] : [
+    { phase: "A", value: latest.currentUnbalanceA?.value || 0, label: "currentUnbalance : Phase A" },
+    { phase: "B", value: latest.currentUnbalanceB?.value || 0, label: "currentUnbalance : Phase B" },
+    { phase: "C", value: latest.currentUnbalanceC?.value || 0, label: "currentUnbalance : Phase C" },
+  ]
 
-  const buildVoltageUnbalanceData = () => {
-    if (!latest) return []
-    return [
-      { name: "AB",       value: latest.voltageUnbalanceAB?.value || 0,      label: "Voltage Unbalance AB" },
-      { name: "BC",       value: latest.voltageUnbalanceBC?.value || 0,      label: "Voltage Unbalance BC" },
-      { name: "CA",       value: latest.voltageUnbalanceCA?.value || 0,      label: "Voltage Unbalance CA" },
-      { name: "LL Worst", value: latest.voltageUnbalanceLLWorst?.value || 0, label: "Voltage Unbalance LL Worst" },
-      { name: "LN Worst", value: latest.voltageUnbalanceLNWorst?.value || 0, label: "Voltage Unbalance LN Worst" },
-    ]
-  }
+  const buildVoltageUnbalanceData = () => !latest ? [] : [
+    { name: "AB",       value: latest.voltageUnbalanceAB?.value || 0,      label: "Voltage Unbalance AB" },
+    { name: "BC",       value: latest.voltageUnbalanceBC?.value || 0,      label: "Voltage Unbalance BC" },
+    { name: "CA",       value: latest.voltageUnbalanceCA?.value || 0,      label: "Voltage Unbalance CA" },
+    { name: "LL Worst", value: latest.voltageUnbalanceLLWorst?.value || 0, label: "Voltage Unbalance LL Worst" },
+    { name: "LN Worst", value: latest.voltageUnbalanceLNWorst?.value || 0, label: "Voltage Unbalance LN Worst" },
+  ]
 
-  const buildTHDCurrentData = () => {
-    if (!latest) return []
-    return [
-      { name: "A", value: latest.thdCurrentA?.value || 0, label: "THD Current : Phase A" },
-      { name: "B", value: latest.thdCurrentB?.value || 0, label: "THD Current : Phase B" },
-      { name: "C", value: latest.thdCurrentC?.value || 0, label: "THD Current : Phase C" },
-    ]
-  }
+  const buildTHDCurrentData = () => !latest ? [] : [
+    { name: "A", value: latest.thdCurrentA?.value || 0, label: "THD Current : Phase A" },
+    { name: "B", value: latest.thdCurrentB?.value || 0, label: "THD Current : Phase B" },
+    { name: "C", value: latest.thdCurrentC?.value || 0, label: "THD Current : Phase C" },
+  ]
 
-  const buildTHDVoltageData = () => {
-    if (!latest) return []
-    return [
-      { name: "AB", value: latest.thdVoltageAB?.value || 0, label: "THD Voltage AB" },
-      { name: "BC", value: latest.thdVoltageBC?.value || 0, label: "THD Voltage BC" },
-      { name: "CA", value: latest.thdVoltageCA?.value || 0, label: "THD Voltage CA" },
-      { name: "LL", value: latest.thdVoltageLL?.value || 0, label: "THD Voltage LL" },
-      { name: "LN", value: latest.thdVoltageLN?.value || 0, label: "THD Voltage LN" },
-    ]
-  }
+  const buildTHDVoltageData = () => !latest ? [] : [
+    { name: "AB", value: latest.thdVoltageAB?.value || 0, label: "THD Voltage AB" },
+    { name: "BC", value: latest.thdVoltageBC?.value || 0, label: "THD Voltage BC" },
+    { name: "CA", value: latest.thdVoltageCA?.value || 0, label: "THD Voltage CA" },
+    { name: "LL", value: latest.thdVoltageLL?.value || 0, label: "THD Voltage LL" },
+    { name: "LN", value: latest.thdVoltageLN?.value || 0, label: "THD Voltage LN" },
+  ]
 
   const buildVoltageHarmonicsData = () => {
     if (!latest) return []
@@ -314,7 +317,6 @@ export default function UserAnalyticsPage() {
           animation: ddIn 0.13s ease;
         }
         @keyframes ddIn { from { opacity:0; transform:translateY(-5px) } to { opacity:1; transform:translateY(0) } }
-
         .an-check-row {
           display: flex; align-items: center; gap: 9px;
           padding: 8px 10px; border-radius: 8px; cursor: pointer;
@@ -411,7 +413,6 @@ export default function UserAnalyticsPage() {
           background: #e2e8f0; flex-shrink: 0;
         }
 
-        /* KPI value: clamp so it never wraps or overflows */
         .an-kpi-value {
           font-size: clamp(12px, 1.6vw, 17px);
           font-weight: 700;
@@ -636,7 +637,7 @@ export default function UserAnalyticsPage() {
   )
 }
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
   const rawVal = data?.value
@@ -657,7 +658,7 @@ function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Line Chart Block ────────────────────────────────────────────────────────
+// ─── Line Chart Block ──────────────────────────────────────────────────────────
 
 function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   return (
@@ -690,7 +691,7 @@ function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Custom Pie Label ─────────────────────────────────────────────────────────
+// ─── Custom Pie Label ──────────────────────────────────────────────────────────
 
 const RADIAN = Math.PI / 180
 
@@ -698,19 +699,20 @@ function PieLabel({ cx, cy, midAngle, outerRadius, value, unit }: any) {
   const r = outerRadius + 18
   const x = cx + r * Math.cos(-midAngle * RADIAN)
   const y = cy + r * Math.sin(-midAngle * RADIAN)
+  const compact = `${fmtVal(value)} ${unit}`
   return (
     <text
       x={x} y={y}
       textAnchor={x > cx ? "start" : "end"}
       dominantBaseline="central"
-      style={{ fontSize: 8, fontWeight: 600, fill: "#475569" }}
+      style={{ fontSize: 10, fontWeight: 600, fill: "#475569" }}
     >
-      {`${fmtVal(value)} ${unit}`}
+      {compact}
     </text>
   )
 }
 
-// ─── Pie Chart Block ─────────────────────────────────────────────────────────
+// ─── Pie Chart Block ───────────────────────────────────────────────────────────
 
 function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: any) {
   const [hoverCenter, setHoverCenter] = useState(false)
@@ -770,7 +772,7 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: an
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 14, marginTop: 6 }}>
         {data.map((e: any) => (
-          <span key={e.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, fontWeight: 600, color: "#475569" }}>
+          <span key={e.name} style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 9, fontWeight: 600, color: "#475569" }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: PHASE_COLORS[e.name] || "#94a3b8", display: "inline-block" }} />
             Phase {e.name}
           </span>
@@ -780,7 +782,7 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: an
   )
 }
 
-// ─── Phase Bar Chart (A / B / C) ─────────────────────────────────────────────
+// ─── Phase Bar Chart ───────────────────────────────────────────────────────────
 
 function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
   const phaseColors: any = { A: "#ef4444", B: "#f59e0b", C: "#3b82f6" }
@@ -801,10 +803,10 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
               axisLine={false} tickLine={false}
             />
             <YAxis
-              domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value), 1) + 1)]}
-              allowDecimals={false}
               tick={{ fill: "#94a3b8", fontSize: 12 }}
               axisLine={false} tickLine={false}
+              tickFormatter={(v) => `${v}%`}
+              domain={[0, (dataMax: number) => Math.max(dataMax * 1.3, 0.5)]}
             />
             <Tooltip
               contentStyle={{ background: "#0f172a", border: "none", borderRadius: 10, fontSize: 13 }}
@@ -812,7 +814,7 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
               labelStyle={{ color: "#64748b" }}
               formatter={(v: any, _: any, p: any) => [`${v} %`, p.payload.label]}
             />
-            <Bar dataKey="value" barSize={44} radius={[8, 8, 0, 0]}>
+            <Bar dataKey="value" barSize={44} radius={[8, 8, 0, 0]} minPointSize={4}>
               {data.map((e: any, i: number) => {
                 const k = e.phase || e.name
                 return <Cell key={i} fill={phaseColors[k] || "#94a3b8"} />
@@ -825,7 +827,7 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
   )
 }
 
-// ─── Multi-series Bar Chart (AB / BC / CA / LL / LN) ─────────────────────────
+// ─── Multi-series Bar Chart ────────────────────────────────────────────────────
 
 function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
   const colorMap: any = {
@@ -846,8 +848,7 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="name" tick={{ fill: "#64748b", fontSize: 12, fontWeight: 600 }} axisLine={false} tickLine={false} />
             <YAxis
-              domain={[0, Math.ceil(Math.max(...data.map((d: any) => d.value), 1) + 1)]}
-              allowDecimals={false}
+              domain={[0, (dataMax: number) => Math.max(Math.ceil(dataMax * 1.3), 1)]}
               tick={{ fill: "#94a3b8", fontSize: 12 }}
               axisLine={false} tickLine={false}
             />
@@ -857,7 +858,7 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
               labelStyle={{ color: "#64748b" }}
               formatter={(v: any, _: any, p: any) => [`${v} %`, p.payload.label]}
             />
-            <Bar dataKey="value" barSize={34} radius={[7, 7, 0, 0]}>
+            <Bar dataKey="value" barSize={34} radius={[7, 7, 0, 0]} minPointSize={4}>
               {data.map((e: any, i: number) => (
                 <Cell key={i} fill={colorMap[e.name] || "#94a3b8"} />
               ))}
@@ -869,7 +870,7 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
   )
 }
 
-// ─── Harmonics Grouped Chart ──────────────────────────────────────────────────
+// ─── Harmonics Grouped Chart ───────────────────────────────────────────────────
 
 function HarmonicsGroupedChart({ title, data, voltage = true, accentColor = "#1a7a5e" }: any) {
   const harmonicBars = data.filter((d: any) => d.harmonic !== "H1")
@@ -912,7 +913,6 @@ function HarmonicsGroupedChart({ title, data, voltage = true, accentColor = "#1a
         </ResponsiveContainer>
       </div>
 
-      {/* ── H1 Fundamental badges ── */}
       <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, marginTop: 4 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 8px" }}>
           H1 Fundamental

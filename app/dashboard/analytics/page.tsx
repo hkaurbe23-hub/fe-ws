@@ -26,7 +26,6 @@ const PHASE_COLORS: any = {
   C: "#3b82f6",
 }
 
-// ─── Helper: format numbers compactly ────────────────────────────────────────
 function fmtVal(v: number | string | undefined): string {
   if (v === undefined || v === null) return "—"
   const n = Number(v)
@@ -36,6 +35,32 @@ function fmtVal(v: number | string | undefined): string {
   if (Math.abs(n) >= 100) return n.toFixed(2)
   if (Math.abs(n) >= 10) return n.toFixed(3)
   return n.toFixed(4)
+}
+
+// ─── Returns the latest non-zero value for a given key across records ─────────
+function getLatestNonZero(records: any[], key: string): any {
+  if (!records?.length) return undefined
+  for (let i = records.length - 1; i >= 0; i--) {
+    const val = records[i]?.[key]?.value
+    if (val !== undefined && val !== null && Number(val) !== 0) {
+      return records[i][key]
+    }
+  }
+  // All zero — return the actual last value (column is all zero)
+  return records[records.length - 1]?.[key]
+}
+
+// ─── Build a "healthy latest" snapshot from records ───────────────────────────
+function buildHealthyLatest(records: any[]): any {
+  if (!records?.length) return {}
+  const allKeys = Object.keys(records[records.length - 1] || {})
+  const result: any = {}
+  for (const key of allKeys) {
+    result[key] = getLatestNonZero(records, key)
+  }
+  // Always use the actual last timestamp
+  result.timestamp = records[records.length - 1]?.timestamp
+  return result
 }
 
 export default function AdminAnalyticsPage() {
@@ -93,9 +118,6 @@ export default function AdminAnalyticsPage() {
     setLoading(true)
     const res = await fetch(`${API}/api/boards/${boardId}/analytics/${slaveId}`, { headers: { Authorization: `Bearer ${token}` } })
     const json = await res.json()
-    console.log("API response keys:", Object.keys(json))
-    console.log("data.latest:", json.latest)
-    console.log("last record:", json.records?.[json.records.length - 1])
     setData(json)
     localStorage.setItem("admin_analytics_state", JSON.stringify({ selectedBoards, selectedSlaves, data: json }))
     setLoading(false)
@@ -103,7 +125,10 @@ export default function AdminAnalyticsPage() {
     setOpenSlaves(false)
   }
 
-  const latest = data?.latest ?? (data?.records?.length > 0 ? data.records[data.records.length - 1] : {})
+  // ─── Use healthy latest instead of raw latest ──────────────────────────────
+  const latest = data?.records?.length > 0
+    ? buildHealthyLatest(data.records)
+    : (data?.latest ?? {})
 
   const getLoadType = () => {
     if (selectedBoards.length === 0) return null
@@ -121,20 +146,31 @@ export default function AdminAnalyticsPage() {
     return ts.replace("T", " ").replace("Z", "").split(".")[0]
   }
 
+  // ─── Chart: skip zeros, carry forward last healthy value ───────────────────
   const buildChartData = (key: string) => {
     if (!data?.records) return []
     let lastHealthyValue: number | null = null
+    const allZero = data.records.every((r: any) => Number(r[key]?.value ?? 0) === 0)
+
     return data.records.map((r: any, index: number) => {
       const currentValue = Number(r[key]?.value ?? 0)
-      if (lastHealthyValue === null && currentValue > 0) lastHealthyValue = currentValue
-      else if (currentValue === 0) {}
-      else if (lastHealthyValue !== null && currentValue < lastHealthyValue) {}
-      else if (currentValue > 0) lastHealthyValue = currentValue
+
+      if (allZero) {
+        // All zero column — show zeros as-is
+        return { index, value: 0, fullTime: r.timestamp }
+      }
+
+      if (currentValue !== 0) {
+        lastHealthyValue = currentValue
+      }
+
       if (lastHealthyValue === null) return null
+
       return { index, value: lastHealthyValue, fullTime: r.timestamp }
     }).filter(Boolean)
   }
 
+  // ─── Pie: use healthy latest values ───────────────────────────────────────
   const buildPieData = (type: string) => {
     if (!latest) return []
     const map: any = {
@@ -349,7 +385,6 @@ export default function AdminAnalyticsPage() {
           background: #e2e8f0; flex-shrink: 0;
         }
 
-        /* KPI value: clamp so it never wraps or overflows */
         .an-kpi-value {
           font-size: clamp(12px, 1.6vw, 17px);
           font-weight: 700;
@@ -574,7 +609,7 @@ export default function AdminAnalyticsPage() {
   )
 }
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
+// ─── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
   const rawVal = data?.value
@@ -595,7 +630,7 @@ function KPI({ title, data, icon, accent = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Line Chart Block ─────────────────────────────────────────────────────────
+// ─── Line Chart Block ──────────────────────────────────────────────────────────
 
 function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   return (
@@ -628,8 +663,7 @@ function LineBlock({ title, data, color = "#1a7a5e" }: any) {
   )
 }
 
-// ─── Custom Pie Label ─────────────────────────────────────────────────────────
-// Renders compact labels outside the pie, never overlapping the donut hole.
+// ─── Custom Pie Label ──────────────────────────────────────────────────────────
 
 const RADIAN = Math.PI / 180
 
@@ -650,7 +684,7 @@ function PieLabel({ cx, cy, midAngle, outerRadius, value, unit }: any) {
   )
 }
 
-// ─── Pie Chart Block ──────────────────────────────────────────────────────────
+// ─── Pie Chart Block ───────────────────────────────────────────────────────────
 
 function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: any) {
   const totalDisplay = fmtVal(total?.value)
@@ -685,7 +719,6 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: an
                 <Cell key={i} fill={PHASE_COLORS[e.name] || "#94a3b8"} />
               ))}
             </Pie>
-            {/* Centre text rendered via SVG overlay */}
             <text x="50%" y="46%" textAnchor="middle" dominantBaseline="middle"
               style={{ fontSize: 14, fontWeight: 700, fill: "#0f172a" }}>
               {totalDisplay}
@@ -709,7 +742,7 @@ function PieBlock({ title, data, total, accentColor = "#1a7a5e", unit = "" }: an
   )
 }
 
-// ─── Phase Bar Chart (A / B / C) ──────────────────────────────────────────────
+// ─── Phase Bar Chart ───────────────────────────────────────────────────────────
 
 function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
   const phaseColors: any = { A: "#ef4444", B: "#f59e0b", C: "#3b82f6" }
@@ -754,7 +787,7 @@ function PhaseBarChart({ title, data, accentColor = "#ef4444" }: any) {
   )
 }
 
-// ─── Multi-series Bar Chart (AB / BC / CA / LL / LN) ─────────────────────────
+// ─── Multi-series Bar Chart ────────────────────────────────────────────────────
 
 function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
   const colorMap: any = {
@@ -797,7 +830,7 @@ function MultiBarChart({ title, data, accentColor = "#f59e0b" }: any) {
   )
 }
 
-// ─── Harmonics Grouped Chart ──────────────────────────────────────────────────
+// ─── Harmonics Grouped Chart ───────────────────────────────────────────────────
 
 function HarmonicsGroupedChart({ title, data, voltage = true, accentColor = "#1a7a5e" }: any) {
   const harmonicBars = data.filter((d: any) => d.harmonic !== "H1")
@@ -840,7 +873,6 @@ function HarmonicsGroupedChart({ title, data, voltage = true, accentColor = "#1a
         </ResponsiveContainer>
       </div>
 
-      {/* ── H1 Fundamental badges ── */}
       <div style={{ borderTop: "1px solid #f1f5f9", paddingTop: 10, marginTop: 4 }}>
         <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", margin: "0 0 8px" }}>
           H1 Fundamental
