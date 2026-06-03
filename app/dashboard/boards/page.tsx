@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Eye, Pencil, Trash2, LogOut, Search } from "lucide-react"
+import { Eye, Pencil, Trash2, Search } from "lucide-react"
 
 import * as XLSX from "xlsx"
 import { saveAs } from "file-saver"
@@ -69,43 +69,6 @@ export default function BoardsPage() {
       setBoardsByFloor(prev => ({ ...prev, [floorId]: data }))
     } catch (err) {
       console.error("Failed to load boards for floor", floorId)
-    }
-  }
-
-  async function handleExport(floorId: number, floorName: string) {
-    const token = localStorage.getItem("jwtToken")
-    const floorBoards = boardsByFloor[floorId] || []
-    const uniqueEmails = [
-      ...new Set(
-        floorBoards.map((b) => b.email).filter((email): email is string => !!email)
-      ),
-    ]
-
-    if (uniqueEmails.length === 0) { alert("No data available"); return }
-
-    try {
-      let allData: any[] = []
-      for (const email of uniqueEmails) {
-        const res = await fetch(`${API}/api/boards/export/user-data/${email}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        if (!res.ok) continue
-        const data = await res.json()
-        allData = [...allData, ...data]
-      }
-      if (!allData.length) { alert("No data available"); return }
-
-      const ws = XLSX.utils.json_to_sheet(allData)
-      const wb = XLSX.utils.book_new()
-      XLSX.utils.book_append_sheet(wb, ws, floorName)
-      const buffer = XLSX.write(wb, { bookType: "xlsx", type: "array" })
-      const blob = new Blob([buffer], {
-        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      })
-      saveAs(blob, `${floorName}_Boards.xlsx`)
-    } catch (err) {
-      console.error(err)
-      alert("Export failed")
     }
   }
 
@@ -360,13 +323,6 @@ export default function BoardsPage() {
                     onClick={(e) => { e.stopPropagation(); deleteFloor(floor.id) }}
                   >
                     <Trash2 size={17} />
-                  </button>
-                  <button
-                    className="action-btn"
-                    title="Export"
-                    onClick={(e) => { e.stopPropagation(); handleExport(floor.id, floor.name) }}
-                  >
-                    <LogOut size={17} />
                   </button>
                 </div>
               </div>

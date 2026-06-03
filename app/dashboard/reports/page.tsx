@@ -21,6 +21,9 @@ export default function ReportsPage() {
   const [loadingSingle, setLoadingSingle] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [availablePeriods, setAvailablePeriods] = useState<any[]>([])
+  const [openMonth, setOpenMonth] = useState(false)
+const [openYear, setOpenYear] = useState(false)
 
   const token =
     typeof window !== "undefined" ? localStorage.getItem("jwtToken") : null
@@ -48,6 +51,42 @@ export default function ReportsPage() {
     setBoardSlaves((prev: any) => ({ ...prev, [boardId]: json }))
     setSelectedSlaves((prev: any) => ({ ...prev, [boardId]: [] }))
   }
+  useEffect(() => {
+  fetchAvailablePeriods()
+}, [selectedBoards, selectedSlaves])
+
+const fetchAvailablePeriods = async () => {
+  try {
+    if (selectedBoards.length === 0) {
+      setAvailablePeriods([])
+      return
+    }
+
+    const slaveIds = Object.values(selectedSlaves)
+      .flat()
+      .join(",")
+
+    const res = await fetch(
+      `${API}/api/reports/available-periods?board_ids=${selectedBoards.join(",")}&slave_ids=${slaveIds}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+
+    const json = await res.json()
+
+    setAvailablePeriods(json)
+
+    if (json.length > 0) {
+      setSelectedYear(json[0].year)
+      setSelectedMonth(json[0].month)
+    }
+  } catch (err) {
+    console.error(err)
+  }
+}
 
   const toggleBoard = (id: number) => {
     if (selectedBoards.includes(id)) {
@@ -78,6 +117,10 @@ export default function ReportsPage() {
       alert("Select at least one board")
       return
     }
+    if (availablePeriods.length === 0) {
+  alert("No data available for selected boards/slaves")
+  return
+}
     const payload = selectedBoards.map((bid) => ({
       board_id: bid,
       slave_ids: selectedSlaves[bid] || [],
@@ -109,7 +152,18 @@ export default function ReportsPage() {
   }
 
   const handleSingleSheetDownload = async () => {
-    const payload = boards.map((b) => ({ board_id: b.id, slave_ids: [] }))
+    if (selectedBoards.length === 0) {
+  alert("Select at least one board")
+  return
+}
+    if (availablePeriods.length === 0) {
+  alert("No data available for selected boards/slaves")
+  return
+}
+    const payload = selectedBoards.map((bid) => ({
+  board_id: bid,
+  slave_ids: selectedSlaves[bid] || [],
+}))
     setOpenBoards(false)
     setOpenSlaves(false)
     setLoadingSingle(true)
@@ -139,6 +193,16 @@ export default function ReportsPage() {
   const selectedSlaveCount = Object.values(selectedSlaves as Record<string, number[]>)
     .flat()
     .length
+  
+  const availableYears = [
+  ...new Set(
+    availablePeriods.map((p) => p.year)
+  ),
+]
+
+const availableMonths = availablePeriods
+  .filter((p) => p.year === selectedYear)
+  .map((p) => p.month)
 
   return (
     <div
@@ -224,29 +288,38 @@ export default function ReportsPage() {
         }
 
         .ws-select {
-          padding: 10px 16px;
-          background: #ffffff;
-          border: 1.5px solid #99e6da;
-          border-radius: 10px;
-          font-family: 'DM Sans', sans-serif;
-          font-size: 16px;
-          font-weight: 600;
-          color: #111111;
-          cursor: pointer;
-          outline: none;
-          appearance: none;
-          background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2300bfa5' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
-          background-repeat: no-repeat;
-          background-position: right 14px center;
-          background-size: 18px;
-          padding-right: 42px;
-          transition: all 0.18s;
-        }
-        .ws-select:hover, .ws-select:focus {
-          border-color: #00bfa5;
-          background-color: #ffffff;
-        }
+  min-width: 125px;
+  height: 64px;
 
+  padding: 0 42px 0 18px;
+
+  background: #ffffff;
+  border: 1.5px solid #99e6da;
+  border-radius: 14px;
+
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #111111;
+
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%2300bfa5' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  background-size: 18px;
+
+  transition: all 0.18s;
+}
+
+.ws-select:hover,
+.ws-select:focus {
+  border-color: #00bfa5;
+}
+       
         .ws-btn-primary {
           display: flex;
           align-items: center;
@@ -609,27 +682,75 @@ export default function ReportsPage() {
             }}
           />
 
-          {/* MONTH */}
-          <select
-            value={selectedMonth}
-            onChange={(e) => setSelectedMonth(Number(e.target.value))}
-            className="ws-select"
-          >
-            {MONTHS.map((m, i) => (
-              <option key={i} value={i + 1}>{m}</option>
-            ))}
-          </select>
+          {/* MONTH DROPDOWN */}
+<div style={{ position: "relative" }}>
+  <button
+    className={`ws-dropdown-btn`}
+    onClick={() => {
+      setOpenMonth(!openMonth)
+      setOpenYear(false)
+      setOpenBoards(false)
+      setOpenSlaves(false)
+    }}
+  >
+    {MONTHS[selectedMonth - 1]}
+    <ChevronDown
+      size={16}
+      style={{
+        transition: "transform 0.2s",
+        transform: openMonth ? "rotate(180deg)" : "rotate(0)",
+      }}
+    />
+  </button>
+  {openMonth && (
+    <div className="ws-dropdown-menu">
+      {availableMonths.map((m) => (
+        <label
+          key={m}
+          className="ws-checkbox-label"
+          onClick={() => { setSelectedMonth(m); setOpenMonth(false) }}
+        >
+          {MONTHS[m - 1]}
+        </label>
+      ))}
+    </div>
+  )}
+</div>
 
-          {/* YEAR */}
-          <select
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="ws-select"
-          >
-            {[2024, 2025, 2026, 2027].map((y) => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+{/* YEAR DROPDOWN */}
+<div style={{ position: "relative" }}>
+  <button
+    className={`ws-dropdown-btn`}
+    onClick={() => {
+      setOpenYear(!openYear)
+      setOpenMonth(false)
+      setOpenBoards(false)
+      setOpenSlaves(false)
+    }}
+  >
+    {selectedYear}
+    <ChevronDown
+      size={16}
+      style={{
+        transition: "transform 0.2s",
+        transform: openYear ? "rotate(180deg)" : "rotate(0)",
+      }}
+    />
+  </button>
+  {openYear && (
+    <div className="ws-dropdown-menu" style={{ minWidth: 120 }}>
+      {availableYears.map((y) => (
+        <label
+          key={y}
+          className="ws-checkbox-label"
+          onClick={() => { setSelectedYear(Number(y)); setOpenYear(false) }}
+        >
+          {y}
+        </label>
+      ))}
+    </div>
+  )}
+</div>
         </div>
 
         {/* Row 2: Export buttons */}
