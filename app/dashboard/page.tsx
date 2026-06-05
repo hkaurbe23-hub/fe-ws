@@ -66,17 +66,31 @@ export default function DashboardPage() {
         "https://api.wattsense.in"
 
       const res = await fetch(
-        `${apiUrl}/api/admin/stats`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      )
+  `${apiUrl}/api/admin/stats`,
+  {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  }
+)
 
-      if (!res.ok) throw new Error()
+// ✅ Session expired
+if (res.status === 401) {
+  localStorage.removeItem("jwtToken")
+  localStorage.removeItem("userRole")
+  localStorage.removeItem("userEmail")
 
-      const data = await res.json()
+  alert("Your session has expired. Please login again.")
+
+  window.location.href = "/login"
+  return
+}
+
+if (!res.ok) {
+  throw new Error(`HTTP ${res.status}`)
+}
+
+const data = await res.json()
 
       setStatsData({
         totalBoards: data.totalBoards || 0,
